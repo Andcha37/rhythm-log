@@ -18,9 +18,13 @@ test('explicit sleeping window uses model-free parsing',()=>{
  assert.equal(Date.parse(r.sleep.end_at),new Date(2026,9,29,7,10).getTime());
 });
 test('vague and uncertain expressions must fall back, never guess',()=>{
- for(const s of ['어제 저녁 닭가슴살 먹었어','어제 7시 닭가슴살 200g','어제 저녁 7시 닭가슴살을 조금 먹었어','어제 저녁 7시 닭가슴살 200g 사고 왔어']){
+ for(const s of ['어제 저녁 닭가슴살 먹었어','어제 저녁 7시 닭가슴살을 조금 먹었어','어제 저녁 7시 닭가슴살 200g 사고 왔어']){
   assert.equal(tryFastExtract(s,now),null,s);
  }
+ const partial=tryFastExtract('어제 7시 닭가슴살 200g',now);
+ assert.equal(partial?.meal.eaten_at,null);
+ assert.equal(partial?.meal.items[0].quantity,200);
+ assert.ok(partial?.questions.length);
 });
 test('known generic food produces explicitly unverified kcal estimate',()=>{
  const r=tryFastExtract('오늘 점심 12시 밥 1공기',now);
@@ -51,4 +55,25 @@ test('insufficient sleep clock information opens editable review without guessin
 });
 test('food names that include 잠 should not be mistaken for sleep',()=>{
  assert.equal(tryFastExtract('어제 점심 12시 잠봉뵈르 1개',now)?.kind,'meal');
+});
+
+test('implicit separator does not merge multiple foods into one field',()=>{
+ const got=tryFastExtract('오늘 저녁 7시 밥 1공기 닭가슴살 200g 사과 1개',now);
+ assert.equal(got.extractor,'rules');
+ assert.deepEqual(got.meal.items.map(i=>[i.name,i.quantity,i.unit]),[
+  ['밥',1,'공기'],['닭가슴살',200,'g'],['사과',1,'개']
+ ]);
+ assert.equal(got.meal.items[2].calories_kcal,93.6);
+});
+test('unquantified accompanying food is split but remains unknown',()=>{
+ const got=tryFastExtract('어제 점심 밥 1공기, 김치 먹었어',now);
+ assert.equal(got.meal.items.length,2);
+ assert.deepEqual(got.meal.items[1],{name:'김치',quantity:null,unit:''});
+ assert.ok(got.questions.some(q=>q.includes('양')));
+ assert.equal(got.meal.eaten_at,null);
+});
+test('same clock with separated bare foods keeps distinct review rows',()=>{
+ const got=tryFastExtract('오늘 점심 12시 밥, 김치',now);
+ assert.equal(got.meal.items.length,2);
+ assert.ok(got.meal.items.every(i=>i.quantity===null));
 });

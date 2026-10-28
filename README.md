@@ -71,3 +71,7 @@ Target `https://rhythm-log.io` requires separate domain ownership, DNS and GitHu
 - 고성능: `Qwen2.5-3B-Instruct-q4f16_1-MLC`
 - 기존 7B 및 다른 대안 모델은 선택 UI와 모델 매핑에서 제거했습니다. 이전에 다운로드한 7B 모델 캐시는 브라우저에 남을 수 있으며, 새 버전에서는 불러오지 않습니다.
 - 모델 선택은 정확한 WebLLM 런타임 모델 ID를 기준으로 합니다. 대역폭/메모리와 실제 추출 정확도는 장치별로 검증해야 합니다.
+
+## Korean meal segmentation
+
+The deterministic food parser supports multiple foods even without explicit connectors (for example `밥 1공기 닭가슴살 200g`), as well as `과/와`, `하고`, `랑`, commas, plus signs, and Korean counters. Each food renders as an independent editable card; missing quantities stay unknown rather than being inferred. The user may remove an individual food before saving. Non-food/unrecognized phrases fall back to the model rather than being silently inserted.
