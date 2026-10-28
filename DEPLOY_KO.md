@@ -25,14 +25,14 @@
 4. Project URL과 **publishable key (`sb_publishable_...` 또는 제공되는 공개 anon key)** 복사. `service_role` 키는 사용하지 않음.
 5. GitHub **Settings → Secrets and variables → Actions → Variables**에서 `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` 세 개의 공개 변수를 설정합니다. `app/config.js`는 빌드 시 해당 변수들을 읽습니다. 비밀키는 절대 VITE 변수에 입력하지 않습니다.
 
-## 3. 아이디 중복 확인 (선택이 아닌 공개 서비스 필수 UX)
+## 3. 아이디 중복 검사 — 추가 서비스 불필요
 
-1. https://dash.cloudflare.com 에서 Worker를 생성하고 `worker-username-check.js`를 배포.
-2. 비밀값 `CLERK_SECRET_KEY`를 **Worker Secret**으로 입력 (GitHub·클라이언트에 기록 금지).
-3. 공개 설정 `ALLOWED_ORIGINS`에 실제 GitHub Pages **origin** `https://andcha37.github.io` 추가. 경로(`/rhythm-log/`)는 넣지 않음.
-4. GitHub Actions Variables에 `VITE_USERNAME_CHECK_URL`을 `https://<worker>.workers.dev/check`로 설정.
-5. 임의로 연속 요청 시 조회가 남용되지 않도록 Cloudflare 요금제의 속도 제한·보안 규칙을 적용.
-6. 중복 확인은 사전 안내일 뿐 가입 시 Clerk의 최종 원자적 중복 검사 결과가 우선.
+- 기본 설정은 Cloudflare Worker 없이 작동합니다.
+- **아이디 형식 확인** 버튼은 브라우저에서 형식만 검증합니다. 이미 사용 중인지는 미리 확인하지 않습니다.
+- 사용자가 **회원가입**을 누르면 Clerk 서버가 아이디 중복 여부를 최종 확인합니다. 중복일 경우 가입을 거절합니다.
+- 이 방식으로 충분하며 새로운 API 서비스나 별도 SQL username 테이블이 필요하지 않습니다.
+- '가입 버튼 전' 중복 여부를 따로 조회하는 기능은 선택 사항입니다. 필요하다면 이미 사용 중인 Supabase의 Edge Function에서 서버 측 Clerk API를 호출할 수 있습니다. Clerk Secret Key는 Edge Function Secret에만 보관하고 조회 속도를 제한해야 합니다.
+- 공개 사용자명 존재 확인 기능은 사용자 열거 위험이 있으므로 초기 버전에서는 구현하지 않는 편이 안전합니다.
 
 ## 4. GitHub Pages 배포
 
