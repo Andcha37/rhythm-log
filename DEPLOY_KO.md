@@ -3,10 +3,11 @@
 > 코드가 배포되었다는 것과 회원가입/데이터 저장/RLS가 정상 동작한다는 것은 별개입니다.
 > 이 프로젝트는 개인 식사·수면 기록을 다룹니다. 실제 사용자 가입 전 **두 계정 교차 접근 테스트와 기록 삭제 테스트**를 반드시 완료하세요.
 
-## 0. 신규 GitHub 저장소 (필수)
+## 0. GitHub Pages 배포 완료
 
-GitHub에서 **`rhythm-log`**라는 새 공개 저장소를 만들고 **README, license, gitignore 자동 생성은 체크하지 마세요**.
-저장소를 만들면 GitHub Actions로 웹사이트를 배포할 수 있습니다.
+저장소: https://github.com/Andcha37/rhythm-log
+웹주소: https://andcha37.github.io/rhythm-log/
+도메인 구매는 필요 없습니다. GitHub Pages는 정적 호스팅이며 인증과 데이터는 Clerk·Supabase에 보관됩니다.
 
 ## 1. Clerk 설정 (아이디만 사용)
 
@@ -22,14 +23,14 @@ GitHub에서 **`rhythm-log`**라는 새 공개 저장소를 만들고 **README, 
 2. Clerk 통합: Clerk 대시보드에서 Supabase integration 활성화 및 Clerk 도메인 확인 → Supabase > Authentication > Third-Party Auth > Clerk에 등록.
 3. Supabase SQL Editor에서 순서대로 `supabase/migrations/001_initial.sql`, `002_user_data_purge.sql` 실행.
 4. Project URL과 **publishable key (`sb_publishable_...` 또는 제공되는 공개 anon key)** 복사. `service_role` 키는 사용하지 않음.
-5. `app/config.js`의 세 공개 값을 교체. 세 값은 클라이언트 공개 값이지만 비밀키는 절대 입력하지 않음.
+5. GitHub **Settings → Secrets and variables → Actions → Variables**에서 `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` 세 개의 공개 변수를 설정합니다. `app/config.js`는 빌드 시 해당 변수들을 읽습니다. 비밀키는 절대 VITE 변수에 입력하지 않습니다.
 
 ## 3. 아이디 중복 확인 (선택이 아닌 공개 서비스 필수 UX)
 
 1. https://dash.cloudflare.com 에서 Worker를 생성하고 `worker-username-check.js`를 배포.
 2. 비밀값 `CLERK_SECRET_KEY`를 **Worker Secret**으로 입력 (GitHub·클라이언트에 기록 금지).
 3. 공개 설정 `ALLOWED_ORIGINS`에 실제 GitHub Pages **origin** `https://andcha37.github.io` 추가. 경로(`/rhythm-log/`)는 넣지 않음.
-4. `app/config.js`의 `USERNAME_CHECK_URL`을 `https://<worker>.workers.dev/check`로 설정.
+4. GitHub Actions Variables에 `VITE_USERNAME_CHECK_URL`을 `https://<worker>.workers.dev/check`로 설정.
 5. 임의로 연속 요청 시 조회가 남용되지 않도록 Cloudflare 요금제의 속도 제한·보안 규칙을 적용.
 6. 중복 확인은 사전 안내일 뿐 가입 시 Clerk의 최종 원자적 중복 검사 결과가 우선.
 
@@ -65,3 +66,25 @@ Windows에서는 PowerShell과 GitHub CLI(`gh`) 설치 후 프로젝트 폴더�
 - SQL RLS는 정상 사용자 간 자료 격리 장치이고 **Supabase 프로젝트 소유자의 관리자 권한까지 막지는 않음**.
 - 호스팅 및 운영자가 통제하는 DB는 종단간 암호화 서비스가 아님.
 - 본 서비스는 건강 진단 도구가 아니며, 영양값은 검증되지 않으면 NULL로 유지.
+
+
+## 6. GitHub Actions 변수 설정 및 재배포 (권장)
+
+https://github.com/Andcha37/rhythm-log/settings/variables/actions
+
+공개 값만 Repository variables에 저장하세요:
+
+| Name | 어디서 가져오나 |
+|---|---|
+| `VITE_CLERK_PUBLISHABLE_KEY` | Clerk Dashboard의 Publishable Key (`pk_...`) |
+| `VITE_SUPABASE_URL` | Supabase Project URL (`https://...supabase.co`) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase Publishable Key (`sb_publishable_...`) |
+| `VITE_USERNAME_CHECK_URL` | 선택: Cloudflare Worker의 `/check` 주소 |
+
+변수를 저장한 다음 https://github.com/Andcha37/rhythm-log/actions/workflows/pages.yml 에서 **Run workflow**를 실행하세요. GitHub의 Repository Variables는 **기존 빌드에 자동 반영되지 않고 새로운 빌드부터 적용**됩니다.
+
+**주의:** `VITE_*` 값은 최종 사이트의 JavaScript에 공개됩니다. `CLERK_SECRET_KEY`, Supabase secret/service_role, DB 비밀번호를 넣으면 안 됩니다.
+
+### 별도 Supabase 프로젝트 권장
+
+현재 연결된 `lifetrack_skill_app` Supabase 프로젝트에는 `todo_tasks` 테이블이 존재합니다. 이는 다른 용도의 기존 앱으로 보이므로 Rhythm Log의 스키마를 임의로 적용하지 않았습니다. 새 Supabase 프로젝트를 만들고 거기에 마이그레이션을 적용하는 편이 안전합니다.
