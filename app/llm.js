@@ -2,12 +2,11 @@ import {extractJson,validateExtraction} from './parse.js';
 let engine;
 // WebLLM registers model IDs in the exact installed runtime. Never silently switch models.
 const MODELS={
-  '7b':'Qwen2.5-7B-Instruct-q4f16_1-MLC',
-  'deepseek7b':'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC',
-  'llama3b':'Llama-3.2-3B-Instruct-q4f16_1-MLC'
+  '1p5b':'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
+  '3b':'Qwen2.5-3B-Instruct-q4f16_1-MLC'
 };
 let activeModel;
-export function modelName(choice){return MODELS[choice]||MODELS['7b'];}
+export function modelName(choice){return MODELS[choice]||MODELS['1p5b'];}
 export async function ensureModel(choice,onProgress=()=>{}){
   if(!navigator.gpu)throw new Error('WebGPU를 지원하지 않는 브라우저입니다. Edge/Chrome 및 GPU 드라이버를 확인하거나 수동 입력을 이용하세요.');
   // Import through the local Vite bundle. Importing esm.sh directly caused
@@ -20,12 +19,12 @@ export async function ensureModel(choice,onProgress=()=>{}){
   if(!found)throw new Error(`${model}은 현재 WebLLM 패키지의 기본 지원 목록에 없습니다. 지원 모델을 확인해 등록하거나 다른 모델을 선택해야 합니다.`);
   if(engine && activeModel===model)return engine;
   if(engine){try{await engine.unload();}catch{}engine=null;}
-  onProgress('모델을 다운로드·초기화합니다. 첫 실행에는 수 GB 데이터가 필요할 수 있습니다.');
+  onProgress('선택한 모델을 다운로드·초기화합니다. 첫 실행에는 수백 MB~수 GB 다운로드가 필요할 수 있습니다.');
   try {
     engine=await webllm.CreateMLCEngine(model,{initProgressCallback:p=>onProgress(p.text||'모델 초기화 중')});
   } catch(err) {
     engine=null;activeModel=null;
-    throw new Error('모델 로딩 실패. GPU 메모리·WebGPU 지원·다운로드 연결을 확인하거나 3B 모델을 선택하세요: '+(err?.message||String(err)));
+    throw new Error('모델 로딩 실패. GPU 메모리·WebGPU 지원·다운로드 연결을 확인하거나 기본 1.5B 모델을 선택하세요: '+(err?.message||String(err)));
   }
   activeModel=model;
   return engine;

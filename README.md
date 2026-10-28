@@ -64,3 +64,10 @@ See [`DEPLOY_KO.md`](DEPLOY_KO.md), including Windows PowerShell deployment and 
 ## Planned independent domain
 
 Target `https://rhythm-log.io` requires separate domain ownership, DNS and GitHub Pages verification. See [`docs/CUSTOM_DOMAIN.md`](docs/CUSTOM_DOMAIN.md). Until then, the default Pages URL will be `https://andcha37.github.io/rhythm-log/`.
+
+## AI 모델 기본값 (2026-10-29)
+
+- 기본: `Qwen2.5-1.5B-Instruct-q4f16_1-MLC` (WebLLM WebGPU; 초기 다운로드 필요)
+- 고성능: `Qwen2.5-3B-Instruct-q4f16_1-MLC`
+- 기존 7B 및 다른 대안 모델은 선택 UI와 모델 매핑에서 제거했습니다. 이전에 다운로드한 7B 모델 캐시는 브라우저에 남을 수 있으며, 새 버전에서는 불러오지 않습니다.
+- 모델 선택은 정확한 WebLLM 런타임 모델 ID를 기준으로 합니다. 대역폭/메모리와 실제 추출 정확도는 장치별로 검증해야 합니다.

@@ -1,4 +1,4 @@
-const CACHE='rhythm-log-shell-v03';
+const CACHE='rhythm-log-shell-v04';
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(['./','./manifest.webmanifest','./assets/icon.svg'])));
  self.skipWaiting();

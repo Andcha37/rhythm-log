@@ -9,11 +9,23 @@ test('WebLLM is bundled by Vite, not imported from a third-party CDN',()=>{
  assert.doesNotMatch(llm,/import\(['"]https?:\/\//);
 });
 test('selected models are registered, checked, and initialized in the browser',()=>{
- for(const m of ['Qwen2.5-7B-Instruct-q4f16_1-MLC','Llama-3.2-3B-Instruct-q4f16_1-MLC']) assert.ok(llm.includes(m));
+ for(const m of ['Qwen2.5-1.5B-Instruct-q4f16_1-MLC','Qwen2.5-3B-Instruct-q4f16_1-MLC']) assert.ok(llm.includes(m));
+ assert.doesNotMatch(llm,/Qwen2\.5-7B-Instruct|DeepSeek-R1-Distill-Qwen-7B|Llama-3\.2-3B-Instruct/);
+ assert.match(llm,/MODELS\['1p5b'\]/);
  assert.match(llm,/prebuiltAppConfig\?\.model_list/);
  assert.match(llm,/CreateMLCEngine\(model/);
 });
 test('malformed structured model output receives bounded retry',()=>{
  assert.match(llm,/추출 형식 재검증/);
  assert.match(llm,/validateExtraction\(extractJson\(output\)\)/);
+});
+
+test('model selector offers exactly default 1.5B and high-performance 3B',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const chooser=html.match(/<select id="model">([\s\S]*?)<\/select>/)?.[1];
+ assert.ok(chooser,'model select exists');
+ const options=[...chooser.matchAll(/<option value="([^"]+)"[^>]*>/g)].map(x=>x[1]);
+ assert.deepEqual(options,['1p5b','3b']);
+ assert.match(chooser,/value="1p5b" selected/);
+ assert.doesNotMatch(chooser,/7B|DeepSeek|Llama/);
 });
