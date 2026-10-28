@@ -55,12 +55,14 @@ function renderAuthMode(){
  $('password').autocomplete=signupMode?'new-password':'current-password';
  $('auth-submit').textContent=signupMode?'아이디로 회원가입':'로그인';
  checkedUsername=null;
- $('username-check-status').textContent='';
+ $('check-username').textContent=USERNAME_CHECK_URL?'아이디 중복 확인':'아이디 형식 확인';
+ $('username-check-status').textContent=signupMode&&!USERNAME_CHECK_URL?'중복 여부는 회원가입할 때 Clerk에서 자동 확인합니다.':'';
  $('auth-status').textContent='';
 }
 function errorMessage(err){
  const detail=err?.errors?.[0];
- if(detail?.code==='form_identifier_exists'||detail?.code==='form_username_invalid')return '이미 사용 중이거나 허용되지 않는 아이디입니다.';
+ if(detail?.code==='form_identifier_exists')return '이미 사용 중인 아이디입니다. 다른 아이디를 입력하세요.';
+ if(detail?.code==='form_username_invalid')return 'Clerk가 허용하지 않는 아이디 형식입니다. 다른 아이디를 입력하세요.';
  if(detail?.code==='form_password_pwned')return '안전하지 않은 비밀번호입니다. 다른 비밀번호를 사용하세요.';
  return detail?.longMessage||detail?.message||err?.message||'인증 요청을 처리하지 못했습니다.';
 }
@@ -68,7 +70,7 @@ async function checkUsername(){
  const username=normalizeUsername($('username').value);
  checkedUsername=null;
  if(!usernameValid(username)){$('username-check-status').textContent='영문·숫자·밑줄 4~24자이며 영문으로 시작해야 합니다.';return;}
- if(!USERNAME_CHECK_URL){$('username-check-status').textContent='중복 조회 서버를 아직 설정하지 않았습니다. 가입 시 Clerk 서버에서 중복을 최종 검사합니다.';return;}
+ if(!USERNAME_CHECK_URL){$('username-check-status').textContent='아이디 형식이 올바릅니다. 중복 여부는 가입할 때 Clerk에서 자동 검사합니다.';return;}
  $('check-username').disabled=true;
  $('username-check-status').textContent='중복 확인 중…';
  try{
@@ -268,7 +270,7 @@ function events(){
  $('mode-login').onclick=()=>{signupMode=false;renderAuthMode()};
  $('mode-signup').onclick=()=>{signupMode=true;renderAuthMode()};
  $('check-username').onclick=checkUsername;
- $('username').addEventListener('input',()=>{checkedUsername=null;$('username-check-status').textContent='아이디를 수정했습니다. 다시 중복 확인해 주세요.';});
+ $('username').addEventListener('input',()=>{checkedUsername=null;$('username-check-status').textContent=USERNAME_CHECK_URL?'아이디를 수정했습니다. 다시 중복 확인해 주세요.':'아이디를 수정했습니다. 형식을 확인해 주세요. 중복 여부는 가입 시 자동 검사됩니다.';});
  $('auth-submit').onclick=authAction;
  $('password').addEventListener('keydown',e=>{if(e.key==='Enter')authAction()});
  $('signout').onclick=async()=>{if(clerk)await clerk.signOut();};
