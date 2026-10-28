@@ -21,7 +21,7 @@ function calendarDate(text,now){
  return null;
 }
 function clockTime(text){
- const m=/(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분?)?\b|\b(\d{1,2}):(\d{2})\b/.exec(text);
+ const m=/(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분?)?|(\d{1,2}):(\d{2})/.exec(text);
  if(!m)return null;
  let hour=Number(m[1]??m[3]),min=Number(m[2]??m[4]??0);
  if(hour>23||min>59)return null;
