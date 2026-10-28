@@ -1,6 +1,7 @@
 import {extractJson,validateExtraction,validTime} from './parse.js';
 import {referenceDates,resolveMealTimeFromText,resolveSleepTimesFromText,normalizeModelTimestamp} from './temporal.js';
 import {tryFastExtract} from './fastpath.js';
+import {enrichMealDraft} from './nutrition.js';
 let engine;
 // WebLLM registers model IDs in the exact installed runtime. Never silently switch models.
 const MODELS={
@@ -75,7 +76,7 @@ export async function extractEntry(text,choice,onProgress=()=>{}){
         if(!obj.sleep.start_at||!obj.sleep.end_at)obj.questions=[...(Array.isArray(obj.questions)?obj.questions:[]),'수면 시작과 종료 시각을 확인해 주세요.'];
       }
     }
-    return validateExtraction(obj,{allowMissingTime:true});
+    return enrichMealDraft(validateExtraction(obj,{allowMissingTime:true}));
   };
   const messages=[{role:'system',content:system},{role:'user',content:String(text)}];
   const tokenBudget=Math.min(550,Math.max(240,Math.ceil(String(text).length*3)));

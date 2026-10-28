@@ -37,7 +37,7 @@ export function validateExtraction(data,{allowMissingTime=false}={}) {
       const minutes=(Date.parse(end)-Date.parse(start))/60000;
       if(minutes<=0||minutes>24*60)throw new Error('수면 종료가 시작 이전이거나 24시간을 초과합니다.');
     }
-    return {kind:'sleep',sleep:{start_at:start,end_at:end,sleep_type:data.sleep.sleep_type==='nap'?'nap':'main'},questions:Array.isArray(data.questions)?data.questions.map(String).slice(0,5):[]};
+    return {kind:'sleep',sleep:{start_at:start,end_at:end,sleep_type:data.sleep.sleep_type==='nap'?'nap':'main',quality:Number.isInteger(Number(data.sleep.quality))&&Number(data.sleep.quality)>=1&&Number(data.sleep.quality)<=5?Number(data.sleep.quality):null},questions:Array.isArray(data.questions)?data.questions.map(String).slice(0,5):[]};
   }
   throw new Error('식사/수면 기록으로 분류하지 못했습니다. 수동 입력을 사용하세요.');
 }

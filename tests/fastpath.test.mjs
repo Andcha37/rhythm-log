@@ -22,8 +22,18 @@ test('vague and uncertain expressions must fall back, never guess',()=>{
   assert.equal(tryFastExtract(s,now),null,s);
  }
 });
-test('fast path does not invent calories or macros',()=>{
+test('known generic food produces explicitly unverified kcal estimate',()=>{
  const r=tryFastExtract('오늘 점심 12시 밥 1공기',now);
  assert.equal(r?.kind,'meal');
- assert.equal('calories_kcal' in r.meal.items[0],false);
+ assert.equal(r.meal.items[0].calories_kcal,273);
+ assert.equal(r.meal.items[0].nutrition_source,'unknown');
+ assert.match(r.meal.items[0].source_note,/추정\(참고용\)/);
+});
+test('Korean counters without clock remain quick but require manual time',()=>{
+ const r=tryFastExtract('어제 점심 김밥 두 줄 먹었어',now);
+ assert.equal(r?.extractor,'rules');
+ assert.equal(r.meal.eaten_at,null);
+ assert.equal(r.meal.items[0].quantity,2);
+ assert.equal(r.meal.items[0].calories_kcal,750);
+ assert.ok(r.questions.length);
 });

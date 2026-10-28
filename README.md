@@ -8,7 +8,7 @@
 - **Username-only signup / login**: 4–24 characters, starting with a Latin letter; `a-z`, digits and underscore; case-insensitive UI normalisation. Signup password confirmation.
 - **No extra provider needed**: By default the button checks username format locally; Clerk's signup backend authoritatively rejects duplicate usernames. A separate availability pre-check API is **optional**, not needed for safe signup.
 - Meal & sleep AI JSON extraction using WebLLM in the user's WebGPU-capable browser; preferred Qwen2.5-7B with honest compatibility checks. Manual entry remains available.
-- Editable review before saving; unknown nutrition values are SQL NULL rather than invented calorie estimates.
+- Editable review before saving; generic foods may receive **clearly labeled unverified estimates** from an embedded reference table (not a validated product database); unmatched foods remain SQL NULL.
 - PostgreSQL tables with authenticated row ownership (Clerk `sub` JWT claim), all-four CRUD RLS policies and a composite foreign key enforcing meal-item ownership; transactional meal insert RPC.
 - Dashboard, 14-day trend chart, meal and sleep logs, report download, JSON export, PWA installation.
 
@@ -42,7 +42,7 @@
 - A browser-side log-in wall is only UI. PostgreSQL RLS is the **authorization boundary**. You must set up Clerk's third-party token integration correctly for RLS to work.
 - Username preflight can reveal whether an account exists (user enumeration). Use conservative rate limiting and privacy notices. It is not proof that the name will still be free at the moment of registration.
 - User-initiated data deletion is available after applying `002_user_data_purge.sql`. Full account removal has not been implemented yet. Configure a secure deletion workflow and privacy notice **before public rollout**, including deleting the user’s app records when a Clerk account is deleted (Clerk user IDs are external, so `ON DELETE CASCADE` from `auth.users` does not apply).
-- Never infer a food's calories or claim health recommendations from incomplete logs. Actual deployed WebLLM/7B GPU performance is device-dependent and not verified in this environment.
+- Generic-food calories/macros are explicitly labeled unverified in `source_note`; never present them as measured intake, product labels or health recommendations. Actual deployed WebLLM/7B GPU performance is device-dependent and not verified in this environment.
 
 ## Validation status
 

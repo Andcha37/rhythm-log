@@ -4,6 +4,7 @@ import {createClient} from '@supabase/supabase-js';
 import {normalizeUsername,usernameValid} from './username.js';
 import {extractEntry} from './llm.js';
 import {numericOrNull,sleepMinutes} from './parse.js';
+import {isEstimatedNote} from './nutrition.js';
 const $=id=>document.getElementById(id);
 const BASE=['dashboard','capture','meals','sleep','reports','settings'];
 const LABELS={dashboard:['DAILY OVERVIEW','오늘의 리듬'],capture:['NATURAL LANGUAGE','새로운 기록'],meals:['MEAL JOURNAL','식사 기록'],sleep:['SLEEP JOURNAL','수면 기록'],reports:['PERSONAL INSIGHTS','추이와 분석'],settings:['YOUR ACCOUNT','설정 및 데이터']};
@@ -160,7 +161,7 @@ function renderList(id,type){
  for(const a of data){const row=node('div','rowrecord'),left=node('div'),right=node('div','right');
   const title=type==='meal'?itemsFor(a).map(i=>i.name).join(', ')||a.meal_type:(a.sleep_type==='nap'?'낮잠':'수면')+' · '+(a.duration_minutes/60).toFixed(1)+'시간';
   left.append(node('strong','',title),node('small','',type==='meal'?fmt(a.eaten_at):fmt(a.start_at)+' ~ '+fmt(a.end_at)));
-  if(type==='meal')right.append(node('span','',mealKcal(a)===null?'열량 미기록':Math.round(mealKcal(a))+' kcal'));
+  if(type==='meal')right.append(node('span','',mealKcal(a)===null?'열량 미기록':(itemsFor(a).some(i=>isEstimatedNote(i.source_note))?'약 ':'')+Math.round(mealKcal(a))+' kcal'));
   const edit=node('button','secondary','수정');edit.type='button';edit.onclick=()=>editRecord(type,a);right.append(edit);
   const del=node('button','delete','삭제');del.onclick=()=>removeRecord(type,a);right.append(del);row.append(left,right);where.append(row);
  }
@@ -171,7 +172,7 @@ function renderRecent(){const where=$('recent-list');where.replaceChildren();con
 function renderReport(last14,meals,sleep){
  const foodDays=meals.filter(x=>x.value!==null),sleepDays=sleep.filter(x=>x.value!==null),partial=meals.filter(x=>x.partial).length;
  const q=$('quality-report');q.replaceChildren();const addStat=(label,value)=>{const r=node('div','statline');r.append(node('span','',label),node('b','',value));q.append(r);};
- addStat('열량이 기록된 날짜',foodDays.length+' / 14일');addStat('열량 일부 누락 날짜',partial+'일');addStat('수면이 기록된 날짜',sleepDays.length+' / 14일');addStat('기록된 전체 수면 횟수',records.sleep.filter(x=>last14.includes(dateKey(x.end_at))).length+'회');
+ addStat('열량이 기록된 날짜',foodDays.length+' / 14일');addStat('추정치 포함 음식',records.items.filter(i=>isEstimatedNote(i.source_note)&&last14.includes(dateKey(records.meals.find(m=>m.id===i.meal_id)?.eaten_at||0))).length+'개');addStat('열량 일부 누락 날짜',partial+'일');addStat('수면이 기록된 날짜',sleepDays.length+' / 14일');addStat('기록된 전체 수면 횟수',records.sleep.filter(x=>last14.includes(dateKey(x.end_at))).length+'회');
  const where=$('insight-report');where.replaceChildren();
  if(!sleepDays.length&&!foodDays.length)return empty(where,'분석할 기록이 아직 충분하지 않습니다.');
  if(sleepDays.length)where.append(node('p','noticebox',`수면 기록이 있는 ${sleepDays.length}일의 일별 총 수면 평균은 ${(sleepDays.reduce((a,b)=>a+b.value,0)/sleepDays.length).toFixed(1)}시간입니다. 누락된 날짜는 평균에서 제외했어요.`));
@@ -212,10 +213,10 @@ function selectField(parent,label,options,value,name){const wrap=node('div','fie
 function renderReview(){
  $('review-title').textContent=editing?'기록 수정':'저장 전 확인';
  const box=$('review-fields');box.replaceChildren();$('review').hidden=false;
- $('review-note').textContent='AI 출력은 초안입니다. 날짜·시각·음식 양을 확인하세요. 비어 있는 날짜·시각은 직접 입력해야 저장할 수 있습니다. 열량은 제공된 자료가 없으면 미기록으로 저장합니다.'+(draft.questions?.length?' 확인 사항: '+draft.questions.join(' / '):'');
+ $('review-note').textContent='AI 및 규칙 기반 추출은 검토용 초안입니다. 날짜·시각·음식 양을 확인하세요. 일반 식품 평균치에서 자동 추정된 영양값은 검증되지 않았으며, 제품·조리법에 따라 차이가 날 수 있습니다.'+(draft.questions?.length?' 확인 사항: '+draft.questions.join(' / '):'');
  if(draft.kind==='meal'){
   const meta=node('div','formgrid');field(meta,'먹은 일시','datetime-local',dateTimeLocal(draft.meal.eaten_at),'eaten_at');selectField(meta,'식사 유형',[['breakfast','아침'],['lunch','점심'],['dinner','저녁'],['snack','간식'],['other','기타']],draft.meal.meal_type,'meal_type');box.append(meta);
-  draft.meal.items.forEach((item,index)=>{const card=node('div','foodline');card.append(node('h4','',`음식 ${index+1}`));const grid=node('div','formgrid');field(grid,'음식명','text',item.name,'name');field(grid,'양','number',item.quantity,'quantity');field(grid,'단위','text',item.unit,'unit');field(grid,'열량 kcal (선택)','number',item.calories_kcal,'calories_kcal');field(grid,'단백질 g (선택)','number',item.protein_g,'protein_g');field(grid,'탄수화물 g (선택)','number',item.carbs_g,'carbs_g');field(grid,'지방 g (선택)','number',item.fat_g,'fat_g');selectField(grid,'영양값 출처',[['unknown','미기록'],['user_provided','직접 입력'],['verified_label','제품 영양표시'],['verified_database','검증된 식품 데이터']],item.nutrition_source||'unknown','nutrition_source');card.append(grid);field(card,'영양 정보 출처 메모 (선택)','text',item.source_note,'source_note');box.append(card);});
+  draft.meal.items.forEach((item,index)=>{const card=node('div','foodline');card.append(node('h4','',`음식 ${index+1}${isEstimatedNote(item.source_note)?' · 참고용 추정':''}`));const grid=node('div','formgrid');field(grid,'음식명','text',item.name,'name');field(grid,'양','number',item.quantity,'quantity');field(grid,'단위','text',item.unit,'unit');field(grid,'열량 kcal (선택)','number',item.calories_kcal,'calories_kcal');field(grid,'단백질 g (선택)','number',item.protein_g,'protein_g');field(grid,'탄수화물 g (선택)','number',item.carbs_g,'carbs_g');field(grid,'지방 g (선택)','number',item.fat_g,'fat_g');selectField(grid,'영양값 출처',[['unknown',isEstimatedNote(item.source_note)?'자동 추정 · 미검증':'미기록 / 미검증'],['user_provided','직접 입력'],['verified_label','제품 영양표시'],['verified_database','검증된 식품 데이터']],item.nutrition_source||'unknown','nutrition_source');card.append(grid);field(card,'영양 정보 출처 메모 (선택)','text',item.source_note,'source_note');box.append(card);});
   const plus=node('button','secondary','＋ 음식 추가');plus.type='button';plus.onclick=()=>{const saved=collectDraftFromUI();if(saved.items.length>=15){showStatus('한 기록은 음식 최대 15개까지 저장합니다.');return;}draft.meal.items=[...saved.items,{name:'',quantity:null,unit:'',nutrition_source:'unknown'}];draft.meal.eaten_at=saved.eaten_at;draft.meal.meal_type=saved.meal_type;renderReview();};box.append(plus);
  }else{
   const meta=node('div','formgrid');field(meta,'수면 시작','datetime-local',dateTimeLocal(draft.sleep.start_at),'start_at');field(meta,'수면 종료','datetime-local',dateTimeLocal(draft.sleep.end_at),'end_at');selectField(meta,'수면 유형',[['main','주 수면'],['nap','낮잠']],draft.sleep.sleep_type,'sleep_type');selectField(meta,'주관적 수면의 질',[['','선택 안 함'],['1','1 · 매우 나쁨'],['2','2'],['3','3 · 보통'],['4','4'],['5','5 · 매우 좋음']],draft.sleep.quality===null||draft.sleep.quality===undefined?'':String(draft.sleep.quality),'quality');box.append(meta);
@@ -250,7 +251,7 @@ async function saveDraft(){
  const data=collectDraftFromUI(),raw=$('entry-text').value.trim(),tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Seoul';
   if(draft.kind==='meal'){
    if(data.items.length===0||data.items.length>15)throw Error('음식은 1~15개까지 입력하세요.');
-   for(const item of data.items){if((item.calories_kcal!==null||item.protein_g!==null||item.carbs_g!==null||item.fat_g!==null)&&item.nutrition_source==='unknown')throw Error('영양성분을 입력했다면 해당 음식의 출처 유형을 선택하세요.');}
+   for(const item of data.items){if((item.calories_kcal!==null||item.protein_g!==null||item.carbs_g!==null||item.fat_g!==null)&&item.nutrition_source==='unknown'&&!isEstimatedNote(item.source_note))throw Error('영양성분을 직접 입력했다면 출처 유형을 선택하세요. 자동 추정값은 미검증 상태로 저장됩니다.');}
    const params={p_eaten_at:data.eaten_at,p_timezone:tz,p_meal_type:data.meal_type,p_raw_text:raw,p_notes:'',p_items:data.items};
    const {error}=editing?await db.rpc('update_meal',{p_meal_id:editing.id,...params}):await db.rpc('create_meal',params);if(error)throw error;
   }else{
@@ -280,7 +281,8 @@ function downloadReport(){
  }
  lines.push('',`기록된 수면 날짜 평균: ${sleepVals.length?(sleepVals.reduce((a,b)=>a+b,0)/sleepVals.length).toFixed(1)+'시간 (n='+sleepVals.length+')':'미기록'}`);
  lines.push(`알려진 음식 열량의 기록 날짜 평균: ${kcalVals.length?Math.round(kcalVals.reduce((a,b)=>a+b,0)/kcalVals.length)+'kcal (n='+kcalVals.length+')':'미기록'}`);
- lines.push('누락 또는 부분 기록이 포함될 수 있으므로 실제 섭취 열량의 추정치가 아닙니다.');
+ lines.push('자동 추정 영양값은 일반 식품 평균치로 검증되지 않았습니다.');
+ lines.push('누락 또는 부분 기록이 포함될 수 있으므로 실제 섭취 열량을 확정할 수 없습니다.');
  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
  const url=URL.createObjectURL(blob),a=node('a');a.href=url;a.download='rhythm-report-'+dates.at(-1)+'.txt';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
 }
