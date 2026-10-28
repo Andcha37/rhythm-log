@@ -70,10 +70,10 @@ export async function extractEntry(text,choice,onProgress=()=>{}){
       const explicit=resolveSleepTimesFromText(text,now);
       if(explicit)Object.assign(obj.sleep,explicit);
       else {
-        obj.sleep.start_at=normalizeModelTimestamp(obj.sleep.start_at);
-        obj.sleep.end_at=normalizeModelTimestamp(obj.sleep.end_at);
-        // If text does not contain two full dates/times, human verification is required.
-        if(!obj.sleep.start_at||!obj.sleep.end_at)obj.questions=[...(Array.isArray(obj.questions)?obj.questions:[]),'수면 시작과 종료 시각을 확인해 주세요.'];
+        // Do not trust model-generated clock times that cannot be grounded in the diary.
+        obj.sleep.start_at=null;
+        obj.sleep.end_at=null;
+        obj.questions=[...(Array.isArray(obj.questions)?obj.questions:[]),'수면 시작과 종료 시각을 직접 확인해 주세요.'];
       }
     }
     return enrichMealDraft(validateExtraction(obj,{allowMissingTime:true}));

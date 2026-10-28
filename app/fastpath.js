@@ -9,10 +9,13 @@ const MEAL_END=/\s*(?:(?:을|를)\s*)?(?:먹었어|먹었어요|먹었다|먹었
 export function tryFastExtract(text,now=new Date()){
  const raw=String(text||'').trim();
  if(!raw||raw.length>400)return null;
- if(/잠|잤|수면|취침|기상|일어났/.test(raw)){
+ if(/잠들|잤|잠을|자고|자서|취침|기상|일어났|일어남|일어나|수면|낮잠|깼|깨었/.test(raw)){
    const times=resolveSleepTimesFromText(raw,now);
-   if(times)return {...validateExtraction({kind:'sleep',sleep:{...times,sleep_type:/낮잠/.test(raw)?'nap':'main'},questions:[]}),extractor:'rules'};
-   return null;
+   const questions=times?.inference_note?[times.inference_note]:times?[]:['수면 시작·종료의 날짜와 시간을 확인해 주세요. 예: 어젯밤 11시부터 오늘 아침 7시까지 잤어'];
+   // Even incomplete sleep logs are reviewable immediately rather than
+   // spending 30+ seconds on a model likely to hallucinate missing clocks.
+   const sleep={start_at:times?.start_at||null,end_at:times?.end_at||null,sleep_type:/낮잠/.test(raw)?'nap':'main'};
+   return {...validateExtraction({kind:'sleep',sleep,questions},{allowMissingTime:!times}),extractor:'rules'};
  }
  const at=resolveMealTimeFromText(raw,now),clock=CLOCK.exec(raw);
  // A missing clock stays null and must be reviewed; it is never filled from the meal label.

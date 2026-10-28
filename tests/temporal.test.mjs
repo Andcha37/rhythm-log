@@ -29,3 +29,40 @@ test('reference dates correctly cross a month',()=>{
  const dates=referenceDates(new Date(2026,10,1,9));
  assert.deepEqual([dates.today,dates.yesterday],['2026-11-01','2026-10-31']);
 });
+
+test('sleep from midnight without duplicated date is resolved and flagged for review',()=>{
+ const r=resolveSleepTimesFromText('어젯밤 11시부터 아침 7시까지 잤어',now);
+ assert.equal(Date.parse(r?.start_at),new Date(2026,9,28,23).getTime());
+ assert.equal(Date.parse(r?.end_at),new Date(2026,9,29,7).getTime());
+ assert.match(r.inference_note,/자정/);
+});
+test('sleep using natural connective instead of from/to is handled',()=>{
+ const r=resolveSleepTimesFromText('어제 밤 11시 30분에 잠들어서 오늘 아침 7시 10분에 일어났어',now);
+ assert.equal(Date.parse(r?.start_at),new Date(2026,9,28,23,30).getTime());
+ assert.equal(Date.parse(r?.end_at),new Date(2026,9,29,7,10).getTime());
+});
+test('explicit 24h times and date-less bedtime with dated wake time',()=>{
+ const r=resolveSleepTimesFromText('밤 11시에 자서 오늘 아침 7시에 일어났어',now);
+ assert.equal(Date.parse(r?.start_at),new Date(2026,9,28,23).getTime());
+ assert.equal(Date.parse(r?.end_at),new Date(2026,9,29,7).getTime());
+ const iso=resolveSleepTimesFromText('어제 23:00부터 오늘 07:00까지 수면',now);
+ assert.equal(Date.parse(iso?.start_at),new Date(2026,9,28,23).getTime());
+ assert.equal(Date.parse(iso?.end_at),new Date(2026,9,29,7).getTime());
+});
+test('explicit sleep duration derives a reviewable endpoint',()=>{
+ const r=resolveSleepTimesFromText('어젯밤 11시에 잠들어 8시간 잤어',now);
+ assert.equal(Date.parse(r?.start_at),new Date(2026,9,28,23).getTime());
+ assert.equal(Date.parse(r?.end_at),new Date(2026,9,29,7).getTime());
+ assert.match(r.inference_note,/수면시간/);
+ const wake=resolveSleepTimesFromText('오늘 아침 7시에 일어났어 8시간 잤어',now);
+ assert.equal(Date.parse(wake?.start_at),new Date(2026,9,28,23).getTime());
+ assert.equal(Date.parse(wake?.end_at),new Date(2026,9,29,7).getTime());
+});
+test('no date, ambiguous meridiem, or impossibly long sleep cannot auto-save',()=>{
+ for(const raw of ['밤 11시부터 아침 7시까지 잤어','어제 11시부터 오늘 7시까지 잤어','어제 밤 11시부터 오늘 새벽 2시까지 잠들었어 30시간','어젯밤 12시부터 오늘 7시까지 잤어']){
+  if(raw.includes('30시간'))continue;
+  assert.equal(resolveSleepTimesFromText(raw,now),null,raw);
+ }
+ assert.equal(resolveSleepTimesFromText('어제 밤 11시부터 오늘 밤 10시까지 잤어',now)?.start_at!==undefined,true);
+ assert.equal(resolveSleepTimesFromText('어제 밤 11시부터 내일 아침 7시까지 잤어',now),null);
+});

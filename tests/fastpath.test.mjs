@@ -37,3 +37,18 @@ test('Korean counters without clock remain quick but require manual time',()=>{
  assert.equal(r.meal.items[0].calories_kcal,750);
  assert.ok(r.questions.length);
 });
+
+test('colloquial cross-midnight sleep bypasses slow model and fills both fields',()=>{
+ const r=tryFastExtract('어젯밤 11시부터 아침 7시까지 잤어',now);
+ assert.equal(r?.kind,'sleep');assert.equal(r?.extractor,'rules');
+ assert.ok(r.sleep.start_at);assert.ok(r.sleep.end_at);
+ assert.ok(r.questions.length);
+});
+test('insufficient sleep clock information opens editable review without guessing',()=>{
+ const r=tryFastExtract('어제 잘 못 잤어',now);
+ assert.equal(r?.kind,'sleep');assert.equal(r.sleep.start_at,null);
+ assert.equal(r.sleep.end_at,null);assert.ok(r.questions.length);
+});
+test('food names that include 잠 should not be mistaken for sleep',()=>{
+ assert.equal(tryFastExtract('어제 점심 12시 잠봉뵈르 1개',now)?.kind,'meal');
+});

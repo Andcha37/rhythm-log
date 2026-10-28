@@ -15,7 +15,7 @@ function node(tag,cls,text){const e=document.createElement(tag);if(cls)e.classNa
 function fmt(dt){return new Date(dt).toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function dateKey(dt){const d=new Date(dt);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function dateTimeLocal(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return '';return `${dateKey(d)}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
-function fromLocal(s){const d=new Date(s);if(!s||!Number.isFinite(d.getTime()))throw Error('날짜와 시간을 확인해 주세요.');return d.toISOString();}
+function fromLocal(s){const d=new Date(s);if(!s||!Number.isFinite(d.getTime())||dateTimeLocal(d.toISOString())!==s.slice(0,16))throw Error('유효한 날짜와 시간을 입력해 주세요.');return d.toISOString();}
 function days(n){const arr=[];for(let i=n-1;i>=0;i--){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-i);arr.push(dateKey(d));}return arr;}
 function empty(where,message){where.replaceChildren(node('p','empty',message));}
 function go(tab){if(!BASE.includes(tab))return;currentTab=tab;for(const x of BASE)$(x+'-panel').hidden=x!==tab;document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('section-label').textContent=LABELS[tab][0];$('section-title').textContent=LABELS[tab][1];if(tab==='capture')setTimeout(()=>$('entry-text').focus(),10);window.scrollTo({top:0,behavior:'smooth'});}
@@ -213,13 +213,21 @@ function selectField(parent,label,options,value,name){const wrap=node('div','fie
 function renderReview(){
  $('review-title').textContent=editing?'기록 수정':'저장 전 확인';
  const box=$('review-fields');box.replaceChildren();$('review').hidden=false;
- $('review-note').textContent='AI 및 규칙 기반 추출은 검토용 초안입니다. 날짜·시각·음식 양을 확인하세요. 일반 식품 평균치에서 자동 추정된 영양값은 검증되지 않았으며, 제품·조리법에 따라 차이가 날 수 있습니다.'+(draft.questions?.length?' 확인 사항: '+draft.questions.join(' / '):'');
+ $('save-entry').disabled=false;
+ const note=draft.kind==='sleep'?'수면 시작 및 종료 시각을 확인하세요. 원문에 없는 시각은 임의로 채우지 않습니다.':'날짜·시각·음식 양을 확인하세요. 참고용 영양성분 추정값은 제품·조리법에 따라 차이가 납니다.';
+ $('review-note').textContent=note+(draft.questions?.length?' 확인 사항: '+draft.questions.join(' / '):'');
  if(draft.kind==='meal'){
   const meta=node('div','formgrid');field(meta,'먹은 일시','datetime-local',dateTimeLocal(draft.meal.eaten_at),'eaten_at');selectField(meta,'식사 유형',[['breakfast','아침'],['lunch','점심'],['dinner','저녁'],['snack','간식'],['other','기타']],draft.meal.meal_type,'meal_type');box.append(meta);
   draft.meal.items.forEach((item,index)=>{const card=node('div','foodline');card.append(node('h4','',`음식 ${index+1}${isEstimatedNote(item.source_note)?' · 참고용 추정':''}`));const grid=node('div','formgrid');field(grid,'음식명','text',item.name,'name');field(grid,'양','number',item.quantity,'quantity');field(grid,'단위','text',item.unit,'unit');field(grid,'열량 kcal (선택)','number',item.calories_kcal,'calories_kcal');field(grid,'단백질 g (선택)','number',item.protein_g,'protein_g');field(grid,'탄수화물 g (선택)','number',item.carbs_g,'carbs_g');field(grid,'지방 g (선택)','number',item.fat_g,'fat_g');selectField(grid,'영양값 출처',[['unknown',isEstimatedNote(item.source_note)?'자동 추정 · 미검증':'미기록 / 미검증'],['user_provided','직접 입력'],['verified_label','제품 영양표시'],['verified_database','검증된 식품 데이터']],item.nutrition_source||'unknown','nutrition_source');card.append(grid);field(card,'영양 정보 출처 메모 (선택)','text',item.source_note,'source_note');box.append(card);});
   const plus=node('button','secondary','＋ 음식 추가');plus.type='button';plus.onclick=()=>{const saved=collectDraftFromUI();if(saved.items.length>=15){showStatus('한 기록은 음식 최대 15개까지 저장합니다.');return;}draft.meal.items=[...saved.items,{name:'',quantity:null,unit:'',nutrition_source:'unknown'}];draft.meal.eaten_at=saved.eaten_at;draft.meal.meal_type=saved.meal_type;renderReview();};box.append(plus);
  }else{
-  const meta=node('div','formgrid');field(meta,'수면 시작','datetime-local',dateTimeLocal(draft.sleep.start_at),'start_at');field(meta,'수면 종료','datetime-local',dateTimeLocal(draft.sleep.end_at),'end_at');selectField(meta,'수면 유형',[['main','주 수면'],['nap','낮잠']],draft.sleep.sleep_type,'sleep_type');selectField(meta,'주관적 수면의 질',[['','선택 안 함'],['1','1 · 매우 나쁨'],['2','2'],['3','3 · 보통'],['4','4'],['5','5 · 매우 좋음']],draft.sleep.quality===null||draft.sleep.quality===undefined?'':String(draft.sleep.quality),'quality');box.append(meta);
+  const meta=node('div','formgrid');const start=field(meta,'수면 시작 · 필수','datetime-local',dateTimeLocal(draft.sleep.start_at),'start_at');const end=field(meta,'수면 종료 · 필수','datetime-local',dateTimeLocal(draft.sleep.end_at),'end_at');start.required=true;end.required=true;
+  selectField(meta,'수면 유형',[['main','주 수면'],['nap','낮잠']],draft.sleep.sleep_type,'sleep_type');selectField(meta,'주관적 수면의 질',[['','선택 안 함'],['1','1 · 매우 나쁨'],['2','2'],['3','3 · 보통'],['4','4'],['5','5 · 매우 좋음']],draft.sleep.quality===null||draft.sleep.quality===undefined?'':String(draft.sleep.quality),'quality');box.append(meta);
+  const guidance=node('p','muted small');box.append(guidance);
+  const check=()=>{const a=start.value,b=end.value,minutes=a&&b?(new Date(b)-new Date(a))/60000:NaN;const valid=Number.isFinite(minutes)&&minutes>0&&minutes<=1440&&start.validity.valid&&end.validity.valid;
+   $('save-entry').disabled=!valid;
+   guidance.textContent=!a||!b?'시작·종료 시각을 모두 입력하면 저장 버튼이 활성화됩니다.':valid?'수면시간 '+(minutes/60).toFixed(1)+'시간 · 저장할 수 있습니다.':'종료 시각은 시작보다 나중이어야 하고, 수면시간은 24시간 이하여야 합니다.';};
+  start.addEventListener('input',check);end.addEventListener('input',check);check();
  }
 }
 function collectDraftFromUI(){
@@ -234,7 +242,7 @@ async function analyze(){
  const raw=$('entry-text').value.trim();if(!raw){modelStatus.textContent='먼저 내용을 입력하세요.';return;}
  if(/(?:식사|먹었|먹은|점심|저녁|아침|음식)/.test(raw)&&/(?:잠들|잤어|수면|기상|잠을)/.test(raw)){modelStatus.textContent='식사와 수면을 한 번에 입력하셨네요. 데이터 누락을 막기 위해 각각 별도 기록으로 입력해 주세요.';return;}
  $('analyze').disabled=true;$('review').hidden=true;
- try{const started=performance.now();modelStatus.textContent='분석 준비 중…';draft=await extractEntry(raw,$('model').value,s=>modelStatus.textContent=s);renderReview();const elapsed=((performance.now()-started)/1000).toFixed(1);modelStatus.textContent=`${draft.extractor==='rules'?'즉시 추출':'AI 추출'} 완료 (${elapsed}초). 날짜·시각·음식 양을 확인하고 저장하세요.`;}
+ try{const started=performance.now();modelStatus.textContent='분석 준비 중…';draft=await extractEntry(raw,$('model').value,s=>modelStatus.textContent=s);renderReview();const elapsed=((performance.now()-started)/1000).toFixed(1);const missing=draft.kind==='sleep'&&(!draft.sleep.start_at||!draft.sleep.end_at);modelStatus.textContent=missing?`수면 기록 인식 (${elapsed}초). 시작·종료 시각을 입력해야 저장할 수 있습니다.`:`${draft.extractor==='rules'?'즉시 추출':'AI 추출'} 완료 (${elapsed}초). 날짜·시각·내용을 확인하고 저장하세요.`;}
  catch(e){modelStatus.textContent=e?.message||String(e);}
  finally{$('analyze').disabled=false;}
 }
@@ -264,8 +272,8 @@ async function saveDraft(){
   const wasEdit=!!editing;editing=null;draft=null;$('review').hidden=true;$('entry-text').value='';
   $('save-entry').textContent='확인 후 저장';$('cancel-edit').hidden=true;
   modelStatus.textContent=wasEdit?'수정 성공. 내 기록에 반영되었습니다.':'저장 성공. 내 기록에 반영되었습니다.';
-  await refresh();go(data.items?'meals':'sleep');
- }catch(e){modelStatus.textContent='저장하지 못했습니다: '+(e?.message||e);}
+  await refresh();go(data.items?'meals':'sleep');showStatus(wasEdit?'기존 기록 수정이 완료됐습니다.':'기록이 정상적으로 저장됐습니다.');
+ }catch(e){const message='저장하지 못했습니다: '+(e?.message||e);modelStatus.textContent=message;showStatus(message);}
  finally{button.disabled=false;}
 }
 function downloadReport(){
