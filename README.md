@@ -6,7 +6,7 @@
 
 - Beautiful dark-responsive static web app (Vite) with installable PWA shell.
 - **Username-only signup / login**: 4–24 characters, starting with a Latin letter; `a-z`, digits and underscore; case-insensitive UI normalisation. Signup password confirmation.
-- A dedicated **아이디 중복 확인** button, backed by Clerk's official Backend API through a Cloudflare Worker. It does NOT expose the Clerk secret to visitors.
+- **No extra provider needed**: By default the button checks username format locally; Clerk's signup backend authoritatively rejects duplicate usernames. A separate availability pre-check API is **optional**, not needed for safe signup.
 - Meal & sleep AI JSON extraction using WebLLM in the user's WebGPU-capable browser; preferred Qwen2.5-7B with honest compatibility checks. Manual entry remains available.
 - Editable review before saving; unknown nutrition values are SQL NULL rather than invented calorie estimates.
 - PostgreSQL tables with authenticated row ownership (Clerk `sub` JWT claim), all-four CRUD RLS policies and a composite foreign key enforcing meal-item ownership; transactional meal insert RPC.
@@ -25,7 +25,7 @@
 2. **Supabase**: Create a new project. Enable the **Clerk third-party auth provider** under **Authentication → Sign In / Providers → Add provider → Clerk**. Activate Supabase integration in Clerk and use the Clerk domain provided by Clerk. This integration is mandatory for Supabase to trust Clerk JWTs with `role: authenticated`.
 3. In **Supabase SQL Editor**, run `supabase/migrations/001_initial.sql` on a *new empty project*. For any later migration use a new version. Never use the original v0.1 email+UUID schema here.
 4. Set `app/config.js`: `CLERK_PUBLISHABLE_KEY`, `SUPABASE_URL`, and `SUPABASE_PUBLISHABLE_KEY`. **Only publishable keys** belong in client code. Never paste `CLERK_SECRET_KEY`, `service_role`, database credentials or any password into JavaScript/commits.
-5. For the separate **중복 확인** button: deploy `worker-username-check.js` using `wrangler.username.toml` (edit the `ALLOWED_ORIGINS` exact list to include the site origin and localhost); add `CLERK_SECRET_KEY` as a **Cloudflare Worker Secret**. Place the Worker URL ending `/check` in `USERNAME_CHECK_URL` in `app/config.js`. The Worker uses Clerk's `GET /v1/users?username[]=...` to check exact names, returning only an availability boolean. Preflight checks are advisory; Clerk's signup transaction is authoritative. Rate-limit this public endpoint using Cloudflare security rules for production.
+5. **No Cloudflare setup is required.** The username format check runs locally, while Clerk rejects duplicates during signup. If you explicitly require an availability check *before* signup, you can optionally deploy the included Worker or a Supabase Edge Function, using a server-side Clerk secret; that is extra complexity and must be rate-limited.
 6. In the project root run:
    ```sh
    npm install
