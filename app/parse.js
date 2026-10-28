@@ -16,21 +16,28 @@ export function validTime(value) {
   if(check.getUTCFullYear()!==y||check.getUTCMonth()+1!==mo||check.getUTCDate()!==day||hr>23||min>59||sec>59)return false;
   const d=new Date(value);return Number.isFinite(d.getTime());
 }
-export function validateExtraction(data) {
+export function validateExtraction(data,{allowMissingTime=false}={}) {
   if(!data || typeof data !== 'object') throw new Error('AI 응답이 객체가 아닙니다.');
   if (data.kind === 'meal') {
-    if(!data.meal || !validTime(data.meal.eaten_at))throw new Error('식사 시각을 확인할 수 없습니다. 미리보기에서 직접 설정하세요.');
+    if(!data.meal)throw new Error('식사 정보를 찾지 못했습니다.');
+    if(!validTime(data.meal.eaten_at)&&!allowMissingTime)throw new Error('식사 시각을 확인할 수 없습니다.');
+    const eatenAt=validTime(data.meal.eaten_at)?data.meal.eaten_at:null;
     if (!Array.isArray(data.meal.items) || data.meal.items.length === 0 || data.meal.items.length > 15)throw new Error('음식 목록이 없거나 너무 깁니다.');
     for (const item of data.meal.items) {
       if(typeof item.name!=='string'||!item.name.trim()||item.name.length>140)throw new Error('유효하지 않은 음식명이 있습니다.');
     }
-    return {kind:'meal',meal:{eaten_at:data.meal.eaten_at,meal_type:['breakfast','lunch','dinner','snack','other'].includes(data.meal.meal_type)?data.meal.meal_type:'other',items:data.meal.items.map(x=>({name:String(x.name).trim(),quantity:finitePositive(x.quantity),unit:String(x.unit||'').slice(0,30)}))},questions:Array.isArray(data.questions)?data.questions.map(String).slice(0,5):[]};
+    return {kind:'meal',meal:{eaten_at:eatenAt,meal_type:['breakfast','lunch','dinner','snack','other'].includes(data.meal.meal_type)?data.meal.meal_type:'other',items:data.meal.items.map(x=>({name:String(x.name).trim(),quantity:finitePositive(x.quantity),unit:String(x.unit||'').slice(0,30)}))},questions:Array.isArray(data.questions)?data.questions.map(String).slice(0,5):[]};
   }
   if (data.kind === 'sleep') {
-    if(!data.sleep || !validTime(data.sleep.start_at)||!validTime(data.sleep.end_at)) throw new Error('수면 시작·종료 시각을 확인할 수 없습니다.');
-    const minutes=(Date.parse(data.sleep.end_at)-Date.parse(data.sleep.start_at))/60000;
-    if(minutes<=0||minutes>24*60)throw new Error('수면 종료가 시작 이전이거나 24시간을 초과합니다.');
-    return {kind:'sleep',sleep:{start_at:data.sleep.start_at,end_at:data.sleep.end_at,sleep_type:data.sleep.sleep_type==='nap'?'nap':'main'},questions:Array.isArray(data.questions)?data.questions.map(String).slice(0,5):[]};
+    if(!data.sleep)throw new Error('수면 정보를 찾지 못했습니다.');
+    const start=validTime(data.sleep.start_at)?data.sleep.start_at:null;
+    const end=validTime(data.sleep.end_at)?data.sleep.end_at:null;
+    if((!start||!end)&&!allowMissingTime)throw new Error('수면 시작·종료 시각을 확인할 수 없습니다.');
+    if(start&&end){
+      const minutes=(Date.parse(end)-Date.parse(start))/60000;
+      if(minutes<=0||minutes>24*60)throw new Error('수면 종료가 시작 이전이거나 24시간을 초과합니다.');
+    }
+    return {kind:'sleep',sleep:{start_at:start,end_at:end,sleep_type:data.sleep.sleep_type==='nap'?'nap':'main'},questions:Array.isArray(data.questions)?data.questions.map(String).slice(0,5):[]};
   }
   throw new Error('식사/수면 기록으로 분류하지 못했습니다. 수동 입력을 사용하세요.');
 }

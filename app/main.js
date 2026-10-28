@@ -183,7 +183,7 @@ function field(parent,label,type,value,name){const wrap=node('div','field'),lbl=
 function selectField(parent,label,options,value,name){const wrap=node('div','field'),lbl=node('label','',label),sel=node('select');sel.dataset.name=name;for(const [val,text] of options){const op=node('option','',text);op.value=val;sel.append(op);}sel.value=value;wrap.append(lbl,sel);parent.append(wrap);return sel;}
 function renderReview(){
  const box=$('review-fields');box.replaceChildren();$('review').hidden=false;
- $('review-note').textContent='AI 출력은 초안입니다. 날짜·시각·음식 양을 확인하세요. 열량은 제공된 자료가 없으면 미기록으로 저장합니다.'+(draft.questions?.length?' 확인 사항: '+draft.questions.join(' / '):'');
+ $('review-note').textContent='AI 출력은 초안입니다. 날짜·시각·음식 양을 확인하세요. 비어 있는 날짜·시각은 직접 입력해야 저장할 수 있습니다. 열량은 제공된 자료가 없으면 미기록으로 저장합니다.'+(draft.questions?.length?' 확인 사항: '+draft.questions.join(' / '):'');
  if(draft.kind==='meal'){
   const meta=node('div','formgrid');field(meta,'먹은 일시','datetime-local',dateTimeLocal(draft.meal.eaten_at),'eaten_at');selectField(meta,'식사 유형',[['breakfast','아침'],['lunch','점심'],['dinner','저녁'],['snack','간식'],['other','기타']],draft.meal.meal_type,'meal_type');box.append(meta);
   draft.meal.items.forEach((item,index)=>{const card=node('div','foodline');card.append(node('h4','',`음식 ${index+1}`));const grid=node('div','formgrid');field(grid,'음식명','text',item.name,'name');field(grid,'양','number',item.quantity,'quantity');field(grid,'단위','text',item.unit,'unit');field(grid,'열량 kcal (선택)','number',item.calories_kcal,'calories_kcal');field(grid,'단백질 g (선택)','number',item.protein_g,'protein_g');field(grid,'탄수화물 g (선택)','number',item.carbs_g,'carbs_g');field(grid,'지방 g (선택)','number',item.fat_g,'fat_g');selectField(grid,'영양값 출처',[['unknown','미기록'],['user_provided','직접 입력'],['verified_label','제품 영양표시'],['verified_database','검증된 식품 데이터']],item.nutrition_source||'unknown','nutrition_source');card.append(grid);field(card,'영양 정보 출처 메모 (선택)','text',item.source_note,'source_note');box.append(card);});
@@ -203,7 +203,7 @@ async function analyze(){
  const raw=$('entry-text').value.trim();if(!raw){modelStatus.textContent='먼저 내용을 입력하세요.';return;}
  if(/(?:식사|먹었|먹은|점심|저녁|아침|음식)/.test(raw)&&/(?:잠들|잤어|수면|기상|잠을)/.test(raw)){modelStatus.textContent='식사와 수면을 한 번에 입력하셨네요. 데이터 누락을 막기 위해 각각 별도 기록으로 입력해 주세요.';return;}
  $('analyze').disabled=true;$('review').hidden=true;
- try{modelStatus.textContent='AI 모델 연결 준비 중…';draft=await extractEntry(raw,$('model').value,s=>modelStatus.textContent=s);renderReview();modelStatus.textContent='분석 완료. 검토 후 저장 버튼을 누르세요.';}
+ try{modelStatus.textContent='AI 모델 연결 준비 중…';draft=await extractEntry(raw,$('model').value,s=>modelStatus.textContent=s);renderReview();modelStatus.textContent='내용 추출 완료. 날짜·시각·음식 양을 확인하고 저장하세요.';}
  catch(e){modelStatus.textContent=e?.message||String(e);}
  finally{$('analyze').disabled=false;}
 }
