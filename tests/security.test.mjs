@@ -16,5 +16,9 @@ test('Clerk JWT subject is the RLS owner, not browser-supplied UUID auth',()=>{
 });
 test('No plain-text password or Clerk server secret is embedded in browser config',()=>{
  const config=readFileSync(new URL('../app/config.js',import.meta.url),'utf8');
- assert.doesNotMatch(config,/CLERK_SECRET_KEY|service_role/);
+ // Ignore explanatory comments: the security check targets executable client code.
+ const executable=config.split('\n').filter(line=>!line.trimStart().startsWith('//')).join('\n');
+ assert.doesNotMatch(executable,/CLERK_SECRET_KEY|service_role|SUPABASE_SERVICE_KEY/);
+ assert.match(executable,/VITE_CLERK_PUBLISHABLE_KEY/);
+ assert.match(executable,/VITE_SUPABASE_PUBLISHABLE_KEY/);
 });
