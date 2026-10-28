@@ -16,6 +16,12 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      # Public browser identifiers ONLY. Never put a server secret in VITE_*.
+      VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_USERNAME_CHECK_URL: ${{ vars.VITE_USERNAME_CHECK_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
