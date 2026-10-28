@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clerk/clerk-js": "^5.0.0",
+    "@mlc-ai/web-llm": "0.2.86",
     "@supabase/supabase-js": "^2.0.0"
   },
   "devDependencies": {
