@@ -29,3 +29,15 @@ test('model selector offers exactly default 1.5B and high-performance 3B',()=>{
  assert.match(chooser,/value="1p5b" selected/);
  assert.doesNotMatch(chooser,/7B|DeepSeek|Llama/);
 });
+
+test('JSON output grammar receives a serialized schema string, not undefined',async()=>{
+ const {extractionResponseFormat}=await import('../app/llm.js');
+ const format=extractionResponseFormat();
+ assert.equal(format.type,'json_object');
+ assert.equal(typeof format.schema,'string');
+ const schema=JSON.parse(format.schema);
+ assert.equal(schema.type,'object');
+ assert.deepEqual(schema.properties.kind.enum,['meal','sleep','unknown']);
+ assert.ok(schema.required.includes('kind'));
+ assert.doesNotMatch(llm,/response_format:\\s*\\{type:'json_object'\\}/);
+});
