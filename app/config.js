@@ -1,8 +1,9 @@
-// These values are PUBLIC browser identifiers; they are not server secrets.
-// Fill in your own Clerk and Supabase project values before deployment.
-export const CLERK_PUBLISHABLE_KEY = 'YOUR_CLERK_PUBLISHABLE_KEY';
-export const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
-// Optional Worker endpoint for the dedicated '아이디 중복 확인' button.
-// Clerk itself always checks uniqueness atomically at final registration.
-export const USERNAME_CHECK_URL = '';
+// Public client configuration, injected by Vite at build time.
+// Populate repository Settings -> Secrets and variables -> Actions -> Variables.
+// IMPORTANT: all VITE_* values are visible to every visitor in the compiled app.
+// NEVER store Clerk secret, Supabase service_role or database passwords here.
+const cfg=import.meta.env;
+export const CLERK_PUBLISHABLE_KEY=(cfg.VITE_CLERK_PUBLISHABLE_KEY||'').trim();
+export const SUPABASE_URL=(cfg.VITE_SUPABASE_URL||'').trim();
+export const SUPABASE_PUBLISHABLE_KEY=(cfg.VITE_SUPABASE_PUBLISHABLE_KEY||'').trim();
+export const USERNAME_CHECK_URL=(cfg.VITE_USERNAME_CHECK_URL||'').trim();
