@@ -7,7 +7,7 @@ import {numericOrNull,sleepMinutes} from './parse.js';
 const $=id=>document.getElementById(id);
 const BASE=['dashboard','capture','meals','sleep','reports','settings'];
 const LABELS={dashboard:['DAILY OVERVIEW','오늘의 리듬'],capture:['NATURAL LANGUAGE','새로운 기록'],meals:['MEAL JOURNAL','식사 기록'],sleep:['SLEEP JOURNAL','수면 기록'],reports:['PERSONAL INSIGHTS','추이와 분석'],settings:['YOUR ACCOUNT','설정 및 데이터']};
-let db,clerk,user,signupMode=false,checkedUsername=null,records={meals:[],items:[],sleep:[]},draft=null,currentTab='dashboard',installEvent;
+let db,clerk,user,signupMode=false,checkedUsername=null,records={meals:[],items:[],sleep:[]},draft=null,editing=null,currentTab='dashboard',installEvent;
 const modelStatus=$('ai-status');
 function showStatus(message){$('global-status').textContent=message||'';}
 function node(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
@@ -40,6 +40,7 @@ async function connect(){
 async function applySession(identity){
  const next=identity?{id:identity.id,username:identity.username||'사용자'}:null;
  if(next?.id===user?.id&&!$('workspace').hidden)return;
+ editing=null;draft=null;$('review').hidden=true;
  user=next;setAuthVisible(!!user);
  if(!user){records={meals:[],items:[],sleep:[]};renderAuthMode();return;}
  $('user-label').textContent='@'+user.username;
@@ -160,6 +161,7 @@ function renderList(id,type){
   const title=type==='meal'?itemsFor(a).map(i=>i.name).join(', ')||a.meal_type:(a.sleep_type==='nap'?'낮잠':'수면')+' · '+(a.duration_minutes/60).toFixed(1)+'시간';
   left.append(node('strong','',title),node('small','',type==='meal'?fmt(a.eaten_at):fmt(a.start_at)+' ~ '+fmt(a.end_at)));
   if(type==='meal')right.append(node('span','',mealKcal(a)===null?'열량 미기록':Math.round(mealKcal(a))+' kcal'));
+  const edit=node('button','secondary','수정');edit.type='button';edit.onclick=()=>editRecord(type,a);right.append(edit);
   const del=node('button','delete','삭제');del.onclick=()=>removeRecord(type,a);right.append(del);row.append(left,right);where.append(row);
  }
 }
@@ -175,6 +177,32 @@ function renderReport(last14,meals,sleep){
  if(sleepDays.length)where.append(node('p','noticebox',`수면 기록이 있는 ${sleepDays.length}일의 일별 총 수면 평균은 ${(sleepDays.reduce((a,b)=>a+b.value,0)/sleepDays.length).toFixed(1)}시간입니다. 누락된 날짜는 평균에서 제외했어요.`));
  if(foodDays.length)where.append(node('p','noticebox',`열량을 기록한 ${foodDays.length}일의 평균 기록 열량은 ${Math.round(foodDays.reduce((a,b)=>a+b.value,0)/foodDays.length).toLocaleString()}kcal입니다. 일부 음식의 영양값이 빠진 날짜는 실제 섭취량보다 작게 나타날 수 있어요.`));
 }
+function cancelEdit(){
+ editing=null;draft=null;$('review').hidden=true;$('entry-text').value='';
+ $('save-entry').textContent='확인 후 저장';$('cancel-edit').hidden=true;
+ modelStatus.textContent='수정을 취소했습니다.';
+}
+function editRecord(type,entry){
+ if(!user||entry.user_id!==user.id)return;
+ editing={id:entry.id,type,userId:user.id};
+ $('entry-text').value=entry.raw_text||'';
+ if(type==='meal'){
+  const items=itemsFor(entry);
+  if(!items.length){editing=null;showStatus('음식 항목을 찾을 수 없습니다. 새로고침 후 다시 시도하세요.');return;}
+  draft={kind:'meal',meal:{eaten_at:entry.eaten_at,meal_type:entry.meal_type,items:items.map(i=>({
+   name:i.name,quantity:i.quantity,unit:i.unit,calories_kcal:i.calories_kcal,
+   protein_g:i.protein_g,carbs_g:i.carbs_g,fat_g:i.fat_g,
+   nutrition_source:i.nutrition_source,source_note:i.source_note
+  }))},questions:[]};
+ }else{
+  draft={kind:'sleep',sleep:{start_at:entry.start_at,end_at:entry.end_at,
+   sleep_type:entry.sleep_type,quality:entry.quality},questions:[]};
+ }
+ go('capture');renderReview();
+ $('save-entry').textContent='수정 내용 저장';$('cancel-edit').hidden=false;
+ modelStatus.textContent='기존 기록 수정 중입니다. 변경 후 저장하거나 취소하세요.';
+ $('review').scrollIntoView({behavior:'smooth',block:'start'});
+}
 async function removeRecord(type,entry){
  if(!confirm('선택한 기록을 삭제할까요? 삭제하면 되돌릴 수 없습니다.'))return;
  try{const table=type==='meal'?'meals':'sleep_sessions';const {error}=await db.from(table).delete().eq('id',entry.id).eq('user_id',user.id);if(error)throw error;await refresh();}catch(e){showStatus('삭제 실패: '+(e?.message||e));}
@@ -182,6 +210,7 @@ async function removeRecord(type,entry){
 function field(parent,label,type,value,name){const wrap=node('div','field'),lbl=node('label','',label),input=node(type==='select'?'select':'input');if(type!=='select')input.type=type;input.dataset.name=name;if(value!==undefined&&value!==null)input.value=value;wrap.append(lbl,input);parent.append(wrap);return input;}
 function selectField(parent,label,options,value,name){const wrap=node('div','field'),lbl=node('label','',label),sel=node('select');sel.dataset.name=name;for(const [val,text] of options){const op=node('option','',text);op.value=val;sel.append(op);}sel.value=value;wrap.append(lbl,sel);parent.append(wrap);return sel;}
 function renderReview(){
+ $('review-title').textContent=editing?'기록 수정':'저장 전 확인';
  const box=$('review-fields');box.replaceChildren();$('review').hidden=false;
  $('review-note').textContent='AI 출력은 초안입니다. 날짜·시각·음식 양을 확인하세요. 비어 있는 날짜·시각은 직접 입력해야 저장할 수 있습니다. 열량은 제공된 자료가 없으면 미기록으로 저장합니다.'+(draft.questions?.length?' 확인 사항: '+draft.questions.join(' / '):'');
  if(draft.kind==='meal'){
@@ -189,7 +218,7 @@ function renderReview(){
   draft.meal.items.forEach((item,index)=>{const card=node('div','foodline');card.append(node('h4','',`음식 ${index+1}`));const grid=node('div','formgrid');field(grid,'음식명','text',item.name,'name');field(grid,'양','number',item.quantity,'quantity');field(grid,'단위','text',item.unit,'unit');field(grid,'열량 kcal (선택)','number',item.calories_kcal,'calories_kcal');field(grid,'단백질 g (선택)','number',item.protein_g,'protein_g');field(grid,'탄수화물 g (선택)','number',item.carbs_g,'carbs_g');field(grid,'지방 g (선택)','number',item.fat_g,'fat_g');selectField(grid,'영양값 출처',[['unknown','미기록'],['user_provided','직접 입력'],['verified_label','제품 영양표시'],['verified_database','검증된 식품 데이터']],item.nutrition_source||'unknown','nutrition_source');card.append(grid);field(card,'영양 정보 출처 메모 (선택)','text',item.source_note,'source_note');box.append(card);});
   const plus=node('button','secondary','＋ 음식 추가');plus.type='button';plus.onclick=()=>{const saved=collectDraftFromUI();if(saved.items.length>=15){showStatus('한 기록은 음식 최대 15개까지 저장합니다.');return;}draft.meal.items=[...saved.items,{name:'',quantity:null,unit:'',nutrition_source:'unknown'}];draft.meal.eaten_at=saved.eaten_at;draft.meal.meal_type=saved.meal_type;renderReview();};box.append(plus);
  }else{
-  const meta=node('div','formgrid');field(meta,'수면 시작','datetime-local',dateTimeLocal(draft.sleep.start_at),'start_at');field(meta,'수면 종료','datetime-local',dateTimeLocal(draft.sleep.end_at),'end_at');selectField(meta,'수면 유형',[['main','주 수면'],['nap','낮잠']],draft.sleep.sleep_type,'sleep_type');selectField(meta,'주관적 수면의 질',[['','선택 안 함'],['1','1 · 매우 나쁨'],['2','2'],['3','3 · 보통'],['4','4'],['5','5 · 매우 좋음']],'','quality');box.append(meta);
+  const meta=node('div','formgrid');field(meta,'수면 시작','datetime-local',dateTimeLocal(draft.sleep.start_at),'start_at');field(meta,'수면 종료','datetime-local',dateTimeLocal(draft.sleep.end_at),'end_at');selectField(meta,'수면 유형',[['main','주 수면'],['nap','낮잠']],draft.sleep.sleep_type,'sleep_type');selectField(meta,'주관적 수면의 질',[['','선택 안 함'],['1','1 · 매우 나쁨'],['2','2'],['3','3 · 보통'],['4','4'],['5','5 · 매우 좋음']],draft.sleep.quality===null||draft.sleep.quality===undefined?'':String(draft.sleep.quality),'quality');box.append(meta);
  }
 }
 function collectDraftFromUI(){
@@ -200,6 +229,7 @@ function collectDraftFromUI(){
  return {eaten_at:fromLocal(get('eaten_at')),meal_type:get('meal_type'),items:list};
 }
 async function analyze(){
+ if(editing){modelStatus.textContent='먼저 기존 기록 수정을 저장하거나 취소하세요.';return;}
  const raw=$('entry-text').value.trim();if(!raw){modelStatus.textContent='먼저 내용을 입력하세요.';return;}
  if(/(?:식사|먹었|먹은|점심|저녁|아침|음식)/.test(raw)&&/(?:잠들|잤어|수면|기상|잠을)/.test(raw)){modelStatus.textContent='식사와 수면을 한 번에 입력하셨네요. 데이터 누락을 막기 위해 각각 별도 기록으로 입력해 주세요.';return;}
  $('analyze').disabled=true;$('review').hidden=true;
@@ -208,22 +238,31 @@ async function analyze(){
  finally{$('analyze').disabled=false;}
 }
 function manual(kind){
+ if(editing){modelStatus.textContent='먼저 기존 기록 수정을 저장하거나 취소하세요.';return;}
+ editing=null;$('cancel-edit').hidden=true;$('save-entry').textContent='확인 후 저장';
  const now=new Date(),later=new Date(now.getTime()+8*3600000);
  draft=kind==='meal'?{kind:'meal',meal:{eaten_at:now.toISOString(),meal_type:'other',items:[{name:'',quantity:null,unit:'',nutrition_source:'unknown'}]},questions:[]}:{kind:'sleep',sleep:{start_at:now.toISOString(),end_at:later.toISOString(),sleep_type:'main'},questions:[]};
  renderReview();modelStatus.textContent='수동 입력 모드입니다. 날짜와 시간 및 내용을 직접 검토해주세요.';
 }
 async function saveDraft(){
  if(!draft||!user)return;const button=$('save-entry');button.disabled=true;
- try{const data=collectDraftFromUI(),raw=$('entry-text').value.trim(),tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Seoul';
+ try{if(editing&&editing.userId!==user.id)throw Error('계정이 변경되었습니다. 수정을 중단하세요.');
+ const data=collectDraftFromUI(),raw=$('entry-text').value.trim(),tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Seoul';
   if(draft.kind==='meal'){
    if(data.items.length===0||data.items.length>15)throw Error('음식은 1~15개까지 입력하세요.');
    for(const item of data.items){if((item.calories_kcal!==null||item.protein_g!==null||item.carbs_g!==null||item.fat_g!==null)&&item.nutrition_source==='unknown')throw Error('영양성분을 입력했다면 해당 음식의 출처 유형을 선택하세요.');}
-   const {error}=await db.rpc('create_meal',{p_eaten_at:data.eaten_at,p_timezone:tz,p_meal_type:data.meal_type,p_raw_text:raw,p_notes:'',p_items:data.items});if(error)throw error;
+   const params={p_eaten_at:data.eaten_at,p_timezone:tz,p_meal_type:data.meal_type,p_raw_text:raw,p_notes:'',p_items:data.items};
+   const {error}=editing?await db.rpc('update_meal',{p_meal_id:editing.id,...params}):await db.rpc('create_meal',params);if(error)throw error;
   }else{
    if(sleepMinutes(data.start_at,data.end_at)<=0||sleepMinutes(data.start_at,data.end_at)>1440)throw Error('수면 시작과 종료를 확인하세요 (최대 24시간).');
-   const {error}=await db.from('sleep_sessions').insert({user_id:user.id,start_at:data.start_at,end_at:data.end_at,sleep_type:data.sleep_type,quality:data.quality,raw_text:raw});if(error)throw error;
+   const fields={start_at:data.start_at,end_at:data.end_at,sleep_type:data.sleep_type,quality:data.quality,raw_text:raw};
+   const result=editing?await db.from('sleep_sessions').update(fields).eq('id',editing.id).eq('user_id',user.id).select('id'):await db.from('sleep_sessions').insert({user_id:user.id,...fields});
+   if(result.error)throw result.error;
+   if(editing&&result.data?.length!==1)throw Error('수정할 기록을 찾지 못했거나 권한이 없습니다.');
   }
-  draft=null;$('review').hidden=true;$('entry-text').value='';modelStatus.textContent='저장 성공. 내 기록에 반영되었습니다.';
+  const wasEdit=!!editing;editing=null;draft=null;$('review').hidden=true;$('entry-text').value='';
+  $('save-entry').textContent='확인 후 저장';$('cancel-edit').hidden=true;
+  modelStatus.textContent=wasEdit?'수정 성공. 내 기록에 반영되었습니다.':'저장 성공. 내 기록에 반영되었습니다.';
   await refresh();go(data.items?'meals':'sleep');
  }catch(e){modelStatus.textContent='저장하지 못했습니다: '+(e?.message||e);}
  finally{button.disabled=false;}
@@ -274,7 +313,7 @@ function events(){
  $('auth-submit').onclick=authAction;
  $('password').addEventListener('keydown',e=>{if(e.key==='Enter')authAction()});
  $('signout').onclick=async()=>{if(clerk)await clerk.signOut();};
- $('refresh').onclick=refresh;$('download-report').onclick=downloadReport;$('analyze').onclick=analyze;$('manual-meal').onclick=()=>manual('meal');$('manual-sleep').onclick=()=>manual('sleep');$('save-entry').onclick=saveDraft;$('export').onclick=exportData;$('purge-records').onclick=purgeRecords;
+ $('refresh').onclick=refresh;$('download-report').onclick=downloadReport;$('analyze').onclick=analyze;$('manual-meal').onclick=()=>manual('meal');$('manual-sleep').onclick=()=>manual('sleep');$('save-entry').onclick=saveDraft;$('cancel-edit').onclick=cancelEdit;$('export').onclick=exportData;$('purge-records').onclick=purgeRecords;
  window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installEvent=event;$('install').hidden=false;});$('install').onclick=async()=>{if(installEvent){installEvent.prompt();await installEvent.userChoice;installEvent=null;$('install').hidden=true;}};
 }
 events();connect();

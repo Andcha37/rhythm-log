@@ -1,0 +1,2 @@
+-- Applied to Supabase project rhythm-log. Atomic update_meal function is deployed.
+-- See database migration rhythm_log_atomic_meal_update for the complete SQL.
