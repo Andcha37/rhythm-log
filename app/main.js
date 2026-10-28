@@ -90,7 +90,7 @@ async function authAction(){
  if(!clerk){$('auth-status').textContent='먼저 인증 설정을 완료해 주세요.';return;}
  const username=normalizeUsername($('username').value),password=$('password').value;
  if(!usernameValid(username)){$('auth-status').textContent='아이디는 영문으로 시작하는 4~24자 영문·숫자·밑줄이어야 합니다.';return;}
- if(password.length<8){$('auth-status').textContent='비밀번호를 8자 이상 입력하세요.';return;}
+ if(password.length<15){$('auth-status').textContent='비밀번호는 15자 이상 입력하세요.';return;}
  if(signupMode&&password!==$('password-confirm').value){$('auth-status').textContent='비밀번호 확인이 일치하지 않습니다.';return;}
  if(signupMode&&USERNAME_CHECK_URL&&checkedUsername!==username){$('auth-status').textContent='먼저 아이디 중복 확인을 완료하세요.';return;}
  $('auth-submit').disabled=true;$('auth-status').textContent='계정 처리 중…';
