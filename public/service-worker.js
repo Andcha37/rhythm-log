@@ -4,7 +4,8 @@ self.addEventListener('install',event=>{
  self.skipWaiting();
 });
 self.addEventListener('activate',event=>{
- event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));
+ // Delete only outdated Rhythm Log shell caches; never delete WebLLM model caches.
+ event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('rhythm-log-shell-v') && key!==CACHE).map(key=>caches.delete(key)))));
  self.clients.claim();
 });
 self.addEventListener('fetch',event=>{

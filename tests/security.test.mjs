@@ -22,3 +22,9 @@ test('No plain-text password or Clerk server secret is embedded in browser confi
  assert.match(executable,/VITE_CLERK_PUBLISHABLE_KEY/);
  assert.match(executable,/VITE_SUPABASE_PUBLISHABLE_KEY/);
 });
+
+test('service worker preserves WebLLM caches across deployments',()=>{
+ assert.match(worker,/key\.startsWith\('rhythm-log-shell-v'\)/);
+ assert.match(worker,/key!==CACHE/);
+ assert.doesNotMatch(worker,/keys\.filter\(key=>key!==CACHE\)/);
+});
