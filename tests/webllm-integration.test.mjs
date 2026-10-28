@@ -18,7 +18,8 @@ test('selected models are registered, checked, and initialized in the browser',(
 test('malformed structured model output receives bounded retry through normalized validation',()=>{
  assert.match(llm,/const resolveOutput=\(output\)=>/);
  assert.match(llm,/const obj=extractJson\(output\)/);
- assert.match(llm,/return validateExtraction\(obj,\{allowMissingTime:true\}\)/);
+ // Model output is validated before the optional generic-food nutrition estimate.
+ assert.match(llm,/return enrichMealDraft\(validateExtraction\(obj,\{allowMissingTime:true\}\)\)/);
  assert.match(llm,/try\s*\{\s*return resolveOutput\(output\);\s*\}/);
  assert.match(llm,/추출 형식 재검증/);
  assert.match(llm,/try\s*\{\s*return resolveOutput\(output\);\s*\}/g);
