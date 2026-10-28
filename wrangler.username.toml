@@ -1,0 +1,8 @@
+name = "rhythm-log-username-check"
+main = "worker-username-check.js"
+compatibility_date = "2026-10-15"
+workers_dev = true
+# Use the Cloudflare dashboard for CLERK_SECRET_KEY (Worker Secret).
+# ALLOWED_ORIGINS is a public environment variable; replace with actual site origins.
+[vars]
+ALLOWED_ORIGINS = "https://YOUR_GITHUB_USERNAME.github.io,http://localhost:5173"
