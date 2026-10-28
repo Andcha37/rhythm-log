@@ -15,9 +15,13 @@ test('selected models are registered, checked, and initialized in the browser',(
  assert.match(llm,/prebuiltAppConfig\?\.model_list/);
  assert.match(llm,/CreateMLCEngine\(model/);
 });
-test('malformed structured model output receives bounded retry',()=>{
+test('malformed structured model output receives bounded retry through normalized validation',()=>{
+ assert.match(llm,/const resolveOutput=\(output\)=>/);
+ assert.match(llm,/const obj=extractJson\(output\)/);
+ assert.match(llm,/return validateExtraction\(obj,\{allowMissingTime:true\}\)/);
+ assert.match(llm,/try\s*\{\s*return resolveOutput\(output\);\s*\}/);
  assert.match(llm,/추출 형식 재검증/);
- assert.match(llm,/validateExtraction\(extractJson\(output\)\)/);
+ assert.match(llm,/try\s*\{\s*return resolveOutput\(output\);\s*\}/g);
 });
 
 test('model selector offers exactly default 1.5B and high-performance 3B',()=>{
