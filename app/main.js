@@ -233,7 +233,7 @@ async function analyze(){
  const raw=$('entry-text').value.trim();if(!raw){modelStatus.textContent='먼저 내용을 입력하세요.';return;}
  if(/(?:식사|먹었|먹은|점심|저녁|아침|음식)/.test(raw)&&/(?:잠들|잤어|수면|기상|잠을)/.test(raw)){modelStatus.textContent='식사와 수면을 한 번에 입력하셨네요. 데이터 누락을 막기 위해 각각 별도 기록으로 입력해 주세요.';return;}
  $('analyze').disabled=true;$('review').hidden=true;
- try{modelStatus.textContent='AI 모델 연결 준비 중…';draft=await extractEntry(raw,$('model').value,s=>modelStatus.textContent=s);renderReview();modelStatus.textContent='내용 추출 완료. 날짜·시각·음식 양을 확인하고 저장하세요.';}
+ try{const started=performance.now();modelStatus.textContent='분석 준비 중…';draft=await extractEntry(raw,$('model').value,s=>modelStatus.textContent=s);renderReview();const elapsed=((performance.now()-started)/1000).toFixed(1);modelStatus.textContent=`${draft.extractor==='rules'?'즉시 추출':'AI 추출'} 완료 (${elapsed}초). 날짜·시각·음식 양을 확인하고 저장하세요.`;}
  catch(e){modelStatus.textContent=e?.message||String(e);}
  finally{$('analyze').disabled=false;}
 }
