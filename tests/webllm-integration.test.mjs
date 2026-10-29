@@ -14,6 +14,7 @@ test('selected models are registered, checked, and initialized in the browser',(
  assert.match(llm,/MODELS\['1p5b'\]/);
  assert.match(llm,/prebuiltAppConfig\?\.model_list/);
  assert.match(llm,/CreateMLCEngine\(model/);
+ assert.match(llm,/await discardModel\(\);llm=await ensureModel\(choice,onProgress\)/);
 });
 test('malformed structured model output receives bounded retry through normalized validation',()=>{
  assert.match(llm,/const resolveOutput=\(output\)=>/);
