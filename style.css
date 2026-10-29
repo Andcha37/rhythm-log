@@ -5,3 +5,19 @@
 #username-check-row{margin:8px 0 13px;}
 #username-check-row button{margin-bottom:8px;}
 #username-check-status{min-height:1.2em;margin:0;}
+
+/* Dashboard date range selector and long-range scrollable daily charts. */
+.range-panel{margin-bottom:18px}
+.range-shortcuts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+.range-shortcut{border:1px solid #d9e3e0;background:#fff;border-radius:10px;color:#2d564e;padding:10px 15px;font-weight:700}
+.range-shortcut.active,.range-shortcut[aria-pressed="true"]{background:#2e6659;color:#fff;border-color:#2e6659}
+.range-custom{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.range-custom label{font-size:12px;font-weight:700;color:#59776b;flex:1 1 145px;max-width:240px}
+.range-custom input{display:block;width:100%;margin-top:6px}
+.range-custom button{min-height:43px}
+.range-panel #dashboard-range-status{margin:14px 0 4px}
+.chart-scroll{width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:5px}
+.chart-scroll .chart{min-width:320px}
+.chart-scroll .chartcol{flex:1 0 0}
+#dashboard-details{margin:4px 0 20px}
+@media(max-width:730px){.range-custom{align-items:stretch}.range-custom label{max-width:none;flex-basis:calc(50% - 6px)}.range-custom button{width:100%}}

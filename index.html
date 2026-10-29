@@ -26,9 +26,24 @@
     <div class="side-bottom"><div class="privacy-chip">● 내 기기에서 AI 실행</div><p id="user-label"></p><button id="signout" class="textbutton">로그아웃 ↗</button></div>
   </aside>
   <main class="main"><header class="topbar"><div><p class="eyebrow" id="section-label">DAILY OVERVIEW</p><h1 id="section-title">오늘의 리듬</h1></div><div class="top-actions"><span class="pill">🔒 RLS 보호</span><button id="install" class="secondary" hidden>＋ 앱 설치</button><button id="refresh" class="secondary">↻ 새로고침</button></div></header><div id="global-status" role="status" class="message"></div>
-    <section id="dashboard-panel" class="panel-page"><div class="introline"><p>어제보다 잘 기록하는 오늘. 숫자보다 <b>지속적인 관찰</b>을 중요하게 생각해요.</p><button class="primary compact" data-goto="capture">＋ 오늘 기록하기</button></div>
-      <div class="stats"><article class="metric"><span>최근 7일 식사 기록</span><strong id="metric-meals">—</strong><small>건의 식사</small><span class="metric-icon">◈</span></article><article class="metric"><span>최근 7일 평균 수면</span><strong id="metric-sleep">—</strong><small>기록된 수면 기준</small><span class="metric-icon">☾</span></article><article class="metric"><span>최근 7일 기록 열량</span><strong id="metric-cal">—</strong><small>입력/추정값 포함 · 완전성 별도 표시</small><span class="metric-icon">◎</span></article></div>
-      <div class="dashboard-grid"><article class="surface"><div class="panelhead"><h3>수면 패턴</h3><span>최근 14일</span></div><div id="sleep-chart" class="chart"></div></article><article class="surface"><div class="panelhead"><h3>식사 열량 기록</h3><span>최근 14일</span></div><div id="meal-chart" class="chart"></div></article></div><article class="surface"><div class="panelhead"><h3>최근 기록</h3><button class="textbutton" data-goto="meals">기록 모두 보기 ↗</button></div><div id="recent-list"></div></article>
+    <section id="dashboard-panel" class="panel-page"><div class="introline"><p>어제보다 잘 기록하는 오늘. 숫자보다 <b>지속적인 관찰</b>을 중요하게 생각해요.</p><button class="primary compact" data-goto="capture">＋ 오늘 기록하기</button></div><div class="surface range-panel">
+  <div class="panelhead"><h3>추이 조회 기간</h3><span>선택한 날짜를 포함해 집계</span></div>
+  <div class="range-shortcuts" aria-label="빠른 조회 기간">
+    <button type="button" class="range-shortcut" data-range-days="7">7일</button>
+    <button type="button" class="range-shortcut active" data-range-days="14">14일</button>
+    <button type="button" class="range-shortcut" data-range-days="30">30일</button>
+    <button type="button" class="range-shortcut" data-range-days="90">90일</button>
+  </div>
+  <div class="range-custom">
+    <label>시작일<input id="range-start" type="date" required></label>
+    <label>종료일<input id="range-end" type="date" required></label>
+    <button id="range-apply" type="button" class="primary compact">기간 적용</button>
+  </div>
+  <p id="dashboard-range-status" class="muted small" role="status">기간을 선택해 주세요.</p>
+  <p class="muted small">최대 366일까지 지정할 수 있으며, 날짜별 수면·열량 추이를 좌우로 이동하며 확인할 수 있습니다.</p>
+</div>
+      <div class="stats"><article class="metric"><span>선택 기간 식사 기록</span><strong id="metric-meals">—</strong><small>건의 식사</small><span class="metric-icon">◈</span></article><article class="metric"><span>선택 기간 평균 수면</span><strong id="metric-sleep">—</strong><small>기록된 수면 기준</small><span class="metric-icon">☾</span></article><article class="metric"><span>선택 기간 기록 열량</span><strong id="metric-cal">—</strong><small>입력/추정값 포함 · 완전성 별도 표시</small><span class="metric-icon">◎</span></article></div>
+      <div class="dashboard-grid"><article class="surface"><div class="panelhead"><h3>수면 패턴</h3><span id="sleep-chart-period">14일</span></div><div class="chart-scroll"><div id="sleep-chart" class="chart"></div></div></article><article class="surface"><div class="panelhead"><h3>식사 열량 기록</h3><span id="meal-chart-period">14일</span></div><div class="chart-scroll"><div id="meal-chart" class="chart"></div></div></article></div><p id="dashboard-details" class="muted small" role="status"></p><article class="surface"><div class="panelhead"><h3>최근 기록</h3><button class="textbutton" data-goto="meals">기록 모두 보기 ↗</button></div><div id="recent-list"></div></article>
     </section>
     <section id="capture-panel" class="panel-page" hidden><div class="narrow"><article class="surface capture"><p class="eyebrow">NATURAL LANGUAGE INPUT</p><h2>오늘의 기록을 말하듯 적어주세요.</h2><p class="muted">예: “어제 저녁 7시 닭가슴살 200g과 밥 1공기” 또는 “어젯밤 11시 30분부터 오늘 아침 7시 10분까지 잤어”</p><textarea id="entry-text" maxlength="2500" rows="4" placeholder="무엇을 먹었거나 언제 잠들었나요?"></textarea><div class="rowline"><label class="model-picker">모델 <select id="model"><option value="1p5b" selected>Qwen2.5 1.5B (기본 · 경량)</option><option value="3b">Qwen2.5 3B (고성능)</option></select></label><button id="analyze" class="primary compact">✦ AI로 추출</button></div><p class="muted small">명확한 문장은 GPU 없이 즉시 처리합니다. 복잡한 문장만 브라우저 WebGPU 모델을 사용하며, 참고용 영양 추정값은 저장 전에 검토할 수 있습니다.</p><p id="ai-status" class="message" role="status"></p><div class="split"><button id="manual-meal" class="secondary">＋ 식사 직접 입력</button><button id="manual-sleep" class="secondary">☾ 수면 직접 입력</button></div></article>
       <article id="review" class="surface review" hidden><div class="panelhead"><h3 id="review-title">저장 전 확인</h3><span class="pill">검토 필요</span></div><p id="review-note" class="muted"></p><div id="review-fields"></div><button id="save-entry" class="primary">확인 후 저장</button><button id="cancel-edit" class="secondary" type="button" hidden>수정 취소</button></article></div></section>

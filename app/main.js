@@ -5,10 +5,12 @@ import {normalizeUsername,usernameValid} from './username.js';
 import {extractEntry} from './llm.js';
 import {numericOrNull,sleepMinutes} from './parse.js';
 import {isEstimatedNote} from './nutrition.js';
+import {presetRange,selectRange,queryBounds,aggregateDashboard} from './dashboard.js';
 const $=id=>document.getElementById(id);
 const BASE=['dashboard','capture','meals','sleep','reports','settings'];
 const LABELS={dashboard:['DAILY OVERVIEW','오늘의 리듬'],capture:['NATURAL LANGUAGE','새로운 기록'],meals:['MEAL JOURNAL','식사 기록'],sleep:['SLEEP JOURNAL','수면 기록'],reports:['PERSONAL INSIGHTS','추이와 분석'],settings:['YOUR ACCOUNT','설정 및 데이터']};
 let db,clerk,user,signupMode=false,checkedUsername=null,records={meals:[],items:[],sleep:[]},draft=null,editing=null,currentTab='dashboard',installEvent;
+let dashboardRange=presetRange(14),dashboardRequest=0;
 const modelStatus=$('ai-status');
 function showStatus(message){$('global-status').textContent=message||'';}
 function node(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
@@ -42,8 +44,8 @@ async function applySession(identity){
  const next=identity?{id:identity.id,username:identity.username||'사용자'}:null;
  if(next?.id===user?.id&&!$('workspace').hidden)return;
  editing=null;draft=null;$('review').hidden=true;
- user=next;setAuthVisible(!!user);
- if(!user){records={meals:[],items:[],sleep:[]};renderAuthMode();return;}
+ dashboardRequest++;user=next;setAuthVisible(!!user);
+ if(!user){records={meals:[],items:[],sleep:[]};$('dashboard-range-status').textContent='';clearDashboard();renderAuthMode();return;}
  $('user-label').textContent='@'+user.username;
  $('setting-username').textContent=user.username;
  go('dashboard');await refresh();
@@ -125,9 +127,90 @@ async function refresh(){
   // Reject stale requests after logout or account switching.
   if(!user || user.id!==uid)return;
   records={meals:m.data||[],items:i.data||[],sleep:s.data||[]};
-  renderAll();showStatus('');
+  renderAll();await loadDashboardRange();if(user?.id===uid)showStatus('');
  }catch(e){if(user)showStatus('데이터 불러오기 실패: '+(e?.message||e));}
 }
+// Fetch the selected calendar window independently of the latest-500-record journals.
+// Supabase's default row limit is commonly 1,000, so every query is paginated.
+async function fetchDashboardRows(table,uid,{field,bounds,mealIds}={}){
+ const batchSize=500,rows=[];
+ for(let offset=0;;offset+=batchSize){
+  let query=db.from(table).select('*').eq('user_id',uid);
+  if(field)query=query.gte(field,bounds.from).lt(field,bounds.to).order(field,{ascending:true});
+  if(mealIds)query=query.in('meal_id',mealIds).order('meal_id',{ascending:true});
+  const {data,error}=await query.order('id',{ascending:true}).range(offset,offset+batchSize-1);
+  if(error)throw error;
+  rows.push(...(data||[]));
+  if(rows.length>50000)throw Error('해당 기간의 기록이 너무 많습니다. 조회 구간을 줄여 주세요.');
+  if(!data||data.length<batchSize)break;
+ }
+ return rows;
+}
+async function fetchDashboardData(uid,period){
+ const bounds=queryBounds(period);
+ const [meals,sleep]=await Promise.all([
+  fetchDashboardRows('meals',uid,{field:'eaten_at',bounds}),
+  fetchDashboardRows('sleep_sessions',uid,{field:'end_at',bounds})
+ ]);
+ const ids=meals.map(m=>m.id),chunks=[];
+ for(let i=0;i<ids.length;i+=70)chunks.push(ids.slice(i,i+70));
+ const pages=await Promise.all(chunks.map(mealIds=>fetchDashboardRows('meal_items',uid,{mealIds})));
+ return {meals,items:pages.flat(),sleep};
+}
+function clearDashboard(){
+ for(const id of ['metric-meals','metric-sleep','metric-cal'])$(id).textContent='—';
+ $('sleep-chart').replaceChildren();$('meal-chart').replaceChildren();
+}
+function paintDashboard(data,period){
+ const metrics=aggregateDashboard(data,period);
+ $('metric-meals').textContent=metrics.mealsCount;
+ $('metric-sleep').textContent=metrics.meanSleepHours===null?'미기록':metrics.meanSleepHours.toFixed(1)+' h';
+ $('metric-cal').textContent=metrics.totalCalories===null?'미기록':Math.round(metrics.totalCalories).toLocaleString();
+ $('sleep-chart-period').textContent=period.count+'일';
+ $('meal-chart-period').textContent=period.count+'일';
+ paintChart($('sleep-chart'),metrics.sleepSeries,'h');
+ paintChart($('meal-chart'),metrics.mealSeries,'',true);
+ $('dashboard-details').textContent=period.start+' ~ '+period.end+' ('+period.count+'일) · 열량이 완전히 기록된 식사 '+metrics.completeMeals+'건 · 부분/누락 영양값 포함 '+metrics.partialDays+'일. 미기록 날짜는 0으로 계산하지 않습니다.';
+}
+async function loadDashboardRange(){
+ if(!user||!db)return;
+ const uid=user.id,requested=++dashboardRequest,period={...dashboardRange};
+ clearDashboard();
+ $('dashboard-range-status').textContent='선택한 기간의 기록을 불러오는 중…';
+ try{
+  const data=await fetchDashboardData(uid,period);
+  if(!user||user.id!==uid||requested!==dashboardRequest)return;
+  paintDashboard(data,period);
+  $('dashboard-range-status').textContent='조회 완료: '+period.start+' ~ '+period.end+' · '+period.count+'일';
+ }catch(e){
+  if(!user||user.id!==uid||requested!==dashboardRequest)return;
+  $('dashboard-range-status').textContent='기간 조회 실패: '+(e?.message||e);
+ }
+}
+function syncDashboardRange(){
+ $('range-start').value=dashboardRange.start;
+ $('range-end').value=dashboardRange.end;
+ $('range-end').max=dateKey(new Date());
+ $('range-start').max=dateKey(new Date());
+ document.querySelectorAll('[data-range-days]').forEach(button=>{
+  const n=Number(button.dataset.rangeDays);
+  const preset=presetRange(n);
+  const active=preset.start===dashboardRange.start&&preset.end===dashboardRange.end;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-pressed',String(active));
+ });
+}
+async function applyDashboardRange(start,end){
+ try{
+  const next=selectRange(start,end);
+  dashboardRange=next;
+  syncDashboardRange();
+  await loadDashboardRange();
+ }catch(e){
+  $('dashboard-range-status').textContent=e?.message||'조회 날짜를 확인해 주세요.';
+ }
+}
+
 function itemsFor(meal){return records.items.filter(i=>i.meal_id===meal.id);}
 function mealKcal(meal){const items=itemsFor(meal);if(!items.length||items.some(i=>i.calories_kcal===null))return null;return items.reduce((t,i)=>t+Number(i.calories_kcal),0);}
 function grouped(){
@@ -138,21 +221,23 @@ function grouped(){
  return {groupedMeals,groupedSleep};
 }
 function paintChart(where,series,unit,isKcal=false){
- where.replaceChildren();const values=series.map(x=>x.value).filter(v=>v!==null);const max=Math.max(...values,1);
- for(const day of series){const col=node('div','chartcol'),bar=node('div','bar'+(isKcal?' cal':''));const value=node('div','barvalue',day.value===null?'·':(isKcal?Math.round(day.value):day.value.toFixed(1))+unit);
-  bar.style.height=day.value===null?'0px':Math.max(4,day.value/max*146)+'px';bar.title=day.date+' · '+(day.value===null?'미기록':day.value+unit)+(day.partial?' (부분 기록)':'');
-  const label=node('label','',day.date.slice(5));col.append(value,bar,label);where.append(col);
+ where.replaceChildren();where.style.minWidth=Math.max(320,series.length*46)+'px';
+ const values=series.map(x=>x.value).filter(v=>v!==null);const max=Math.max(...values,1);
+ const labelEvery=series.length>70?7:series.length>35?3:1;
+ for(const [index,day] of series.entries()){
+  const col=node('div','chartcol'),bar=node('div','bar'+(isKcal?' cal':'')),shown=day.value===null?'·':(isKcal?Math.round(day.value):day.value.toFixed(1))+unit;
+  const value=node('div','barvalue',series.length>35?'':shown);
+  bar.style.height=day.value===null?'0px':Math.max(4,day.value/max*146)+'px';
+  col.title=day.date+' · '+(day.value===null?'미기록':shown)+(day.partial?' (부분 기록)':'');
+  const label=node('label','',index%labelEvery===0||index===series.length-1?day.date.slice(5):'');
+  col.append(value,bar,label);where.append(col);
  }
 }
 function renderAll(){
- const {groupedMeals,groupedSleep}=grouped(),last7=days(7),last14=days(14);
- const meals7=last7.reduce((n,d)=>n+(groupedMeals.get(d)?.length||0),0);
- const sleepEntries=last7.flatMap(d=>groupedSleep.get(d)||[]),mean=sleepEntries.length?sleepEntries.reduce((t,s)=>t+s.duration_minutes,0)/sleepEntries.length/60:null;
- const mealEntries=last7.flatMap(d=>groupedMeals.get(d)||[]),known=mealEntries.map(mealKcal).filter(v=>v!==null),total=known.reduce((a,b)=>a+b,0);
- $('metric-meals').textContent=meals7;$('metric-sleep').textContent=mean===null?'미기록':mean.toFixed(1)+' h';$('metric-cal').textContent=known.length?Math.round(total).toLocaleString():'미기록';
- const sleepSeries=last14.map(date=>{const ss=groupedSleep.get(date);return {date,value:ss?.length?ss.reduce((t,s)=>t+s.duration_minutes,0)/60:null}});
+ // Journal and 14-day report remain unchanged; the dashboard loads its own date range.
+ const {groupedMeals,groupedSleep}=grouped(),last14=days(14);
+ const sleepSeries=last14.map(date=>{const ss=groupedSleep.get(date);return {date,value:ss?.length?ss.reduce((t,s)=>t+s.duration_minutes,0)/60:null};});
  const mealSeries=last14.map(date=>{const mm=groupedMeals.get(date);if(!mm?.length)return {date,value:null};const vals=mm.map(mealKcal);const known=vals.filter(v=>v!==null);return {date,value:known.length?known.reduce((a,b)=>a+b,0):null,partial:known.length<vals.length};});
- paintChart($('sleep-chart'),sleepSeries,'h');paintChart($('meal-chart'),mealSeries,'',true);
  renderList('meal-list','meal');renderList('sleep-list','sleep');renderRecent();renderReport(last14,mealSeries,sleepSeries);
 }
 function renderList(id,type){
@@ -317,6 +402,9 @@ async function purgeRecords(){
 
 function exportData(){if(!user)return;const payload={exported_at:new Date().toISOString(),username:user.username,records};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const anchor=node('a');anchor.href=url;anchor.download='rhythm-log-export-'+dateKey(new Date())+'.json';document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),500);}
 function events(){
+ syncDashboardRange();
+ document.querySelectorAll('[data-range-days]').forEach(b=>b.onclick=()=>applyDashboardRange(presetRange(Number(b.dataset.rangeDays)).start,presetRange(Number(b.dataset.rangeDays)).end));
+ $('range-apply').onclick=()=>applyDashboardRange($('range-start').value,$('range-end').value);
  document.querySelectorAll('.navitem').forEach(b=>b.addEventListener('click',()=>go(b.dataset.tab)));
  document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.goto)));
  $('mode-login').onclick=()=>{signupMode=false;renderAuthMode()};
